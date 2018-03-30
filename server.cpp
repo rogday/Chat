@@ -1,5 +1,8 @@
+#include <atomic>
 #include <boost/asio.hpp>
+#include <csignal>
 #include <exception>
+#include <functional>
 #include <iostream>
 #include <memory>
 #include <thread>
@@ -8,22 +11,60 @@
 using namespace boost::asio;
 using socket_ptr = std::shared_ptr<ip::tcp::socket>;
 
-void clientSession(socket_ptr socket, int index) {
+void signalHandler(int);
+void clientSession(socket_ptr, size_t);
+void startAccept(socket_ptr);
+void acceptHandler(socket_ptr, const boost::system::error_code &);
+
+io_service service;
+ip::tcp::acceptor acceptor(service);
+std::atomic<bool> exitServer;
+
+void signalHandler(int sig) {
+	exitServer.store(true);
+	acceptor.cancel();
+}
+
+void clientSession(socket_ptr socket, size_t index) {
+	char data[512];
+
 	std::cout << "Client #" << index << " connected from "
 			  << socket->remote_endpoint().address().to_string() << std::endl;
 
-	for (;;) {
-		char data[512];
+	while (!exitServer.load()) {
 		try {
-			size_t len = socket->read_some(buffer(data, 512));
+			size_t len = socket->receive(buffer(data, 512));
 			if (len > 0)
-				socket->write_some(buffer(data, len));
+				socket->send(buffer(data, len));
 		} catch (std::exception &e) {
 			std::cout << "Client #" << index << " disconnected in cause of \""
 					  << e.what() << '"' << std::endl;
 			return;
 		}
 	}
+
+	socket->close();
+}
+
+void startAccept(socket_ptr socket) {
+	acceptor.async_accept(
+		*socket, std::bind(acceptHandler, socket, std::placeholders::_1));
+}
+
+void acceptHandler(socket_ptr socket, const boost::system::error_code &error) {
+	static size_t clients = 0;
+
+	if (error) {
+		std::cout << "acceptHandler error: " << error << std::endl;
+		return;
+	}
+
+	++clients;
+
+	std::thread(clientSession, socket, clients).detach();
+
+	socket_ptr newSocket(new ip::tcp::socket(service));
+	startAccept(newSocket);
 }
 
 int main(int argc, char *argv[]) {
@@ -53,21 +94,22 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 
-	io_service service;
+	exitServer.store(false);
+	std::signal(SIGINT, signalHandler);
+
 	ip::tcp::endpoint endpoint(ip::tcp::v4(), port);
-	ip::tcp::acceptor acceptor(service, endpoint);
+	service.reset();
+	acceptor.open(endpoint.protocol());
+	acceptor.bind(endpoint);
+	acceptor.listen();
 
-	std::cout << "Server started." << std::endl;
+	std::cout << "Server is up." << std::endl;
 
-	int clients = 1;
-	for (;;) {
-		socket_ptr socket(new ip::tcp::socket(service));
-		acceptor.accept(*socket);
-		std::thread(clientSession, socket, clients).detach();
-		++clients;
-	}
+	socket_ptr socket(new ip::tcp::socket(service));
+	startAccept(socket);
+	service.run();
 
-	ip::tcp::socket socket(service);
-	socket.connect(endpoint);
+	std::cout << "Server is down." << std::endl;
+
 	return 0;
 }
