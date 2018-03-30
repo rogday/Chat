@@ -9,6 +9,9 @@ using namespace boost::asio;
 using socket_ptr = std::shared_ptr<ip::tcp::socket>;
 
 void clientSession(socket_ptr socket, int index) {
+	std::cout << "Client #" << index << " connected from "
+			  << socket->remote_endpoint().address().to_string() << std::endl;
+
 	for (;;) {
 		char data[512];
 		try {
@@ -61,8 +64,6 @@ int main(int argc, char *argv[]) {
 		socket_ptr socket(new ip::tcp::socket(service));
 		acceptor.accept(*socket);
 		std::thread(clientSession, socket, clients).detach();
-
-		std::cout << "Client #" << clients << " connected." << std::endl;
 		++clients;
 	}
 
