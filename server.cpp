@@ -4,6 +4,7 @@
 #include <exception>
 #include <functional>
 #include <iostream>
+#include <list>
 #include <memory>
 #include <thread>
 #include <unistd.h>
@@ -20,9 +21,32 @@ io_service service;
 ip::tcp::acceptor acceptor(service);
 std::atomic<bool> exitServer;
 
+std::list<std::thread> list;
+
 void signalHandler(int sig) {
 	exitServer.store(true);
 	acceptor.cancel();
+}
+
+void startAccept(socket_ptr socket) {
+	acceptor.async_accept(
+		*socket, std::bind(acceptHandler, socket, std::placeholders::_1));
+}
+
+void acceptHandler(socket_ptr socket, const boost::system::error_code &error) {
+	static size_t clients = 0;
+
+	if (error) {
+		std::cout << "acceptHandler error: " << error << std::endl;
+		return;
+	}
+
+	++clients;
+
+	list.push_back(std::thread(clientSession, socket, clients));
+
+	socket_ptr newSocket(new ip::tcp::socket(service));
+	startAccept(newSocket);
 }
 
 void clientSession(socket_ptr socket, size_t index) {
@@ -43,28 +67,7 @@ void clientSession(socket_ptr socket, size_t index) {
 		}
 	}
 
-	socket->close();
-}
-
-void startAccept(socket_ptr socket) {
-	acceptor.async_accept(
-		*socket, std::bind(acceptHandler, socket, std::placeholders::_1));
-}
-
-void acceptHandler(socket_ptr socket, const boost::system::error_code &error) {
-	static size_t clients = 0;
-
-	if (error) {
-		std::cout << "acceptHandler error: " << error << std::endl;
-		return;
-	}
-
-	++clients;
-
-	std::thread(clientSession, socket, clients).detach();
-
-	socket_ptr newSocket(new ip::tcp::socket(service));
-	startAccept(newSocket);
+	std::cout << "Connection interrupted on client #" << index << std::endl;
 }
 
 int main(int argc, char *argv[]) {
@@ -94,6 +97,9 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 
+	// probably UB here: detached threads checking global variable [fixed]
+	// TODO: async read\write, since threads get stiuck on read
+
 	exitServer.store(false);
 	std::signal(SIGINT, signalHandler);
 
@@ -108,6 +114,9 @@ int main(int argc, char *argv[]) {
 	socket_ptr socket(new ip::tcp::socket(service));
 	startAccept(socket);
 	service.run();
+
+	for (auto &t : list)
+		t.join();
 
 	std::cout << "Server is down." << std::endl;
 
