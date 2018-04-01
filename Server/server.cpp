@@ -37,7 +37,7 @@ void acceptHandler(socket_ptr socket, const boost::system::error_code &error) {
 	static size_t clients = 0;
 
 	if (error) {
-		std::cout << "acceptHandler error: " << error << std::endl;
+		std::cerr << "acceptHandler error: " << error << std::endl;
 		return;
 	}
 
@@ -58,8 +58,13 @@ void clientSession(socket_ptr socket, size_t index) {
 	while (!exitServer.load()) {
 		try {
 			size_t len = socket->receive(buffer(data, 512));
-			if (len > 0)
+			if (len > 0) {
+				for (size_t i = 0; i < len; ++i)
+					if (data[i] != ' ')
+						data[i] += 'A' - 'a';
+
 				socket->send(buffer(data, len));
+			}
 		} catch (std::exception &e) {
 			std::cout << "Client #" << index << " disconnected in cause of \""
 					  << e.what() << '"' << std::endl;
