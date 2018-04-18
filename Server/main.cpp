@@ -22,9 +22,10 @@ int main(int argc, char *argv[]) {
 	}
 
 	// probably UB here: detached threads checking global variable [fixed]
-	// TODO: async read\write, since threads get stiuck on read
+	// TODO: async read\write, since threads get stiuck on read [fixed]
 
-	Server::startAtPort(port);
+	Server &srv = Server::getInstance();
+	srv.startAtPort(port);
 
 	return 0;
 }

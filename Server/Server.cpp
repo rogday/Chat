@@ -4,17 +4,13 @@ using namespace boost::asio;
 using namespace std;
 using namespace std::placeholders;
 
-// Server Server::server;
-boost::asio::io_service Server::service;
-boost::asio::ip::tcp::acceptor Server::acceptor(service);
-std::atomic<bool> Server::exitServer;
-std::list<socket_ptr> Server::list;
+Server Server::server;
 
 void Server::signalHandler(int n) {
-	acceptor.close();
-	for (auto &socket : list)
+	server.acceptor.close();
+	for (auto &socket : server.list)
 		socket->cancel();
-	exitServer.store(true);
+	server.exitServer.store(true);
 	signal(n, signalHandler);
 };
 
@@ -41,7 +37,8 @@ void Server::startAtPort(int port) {
 }
 
 void Server::startAccept(socket_ptr socket) {
-	acceptor.async_accept(*socket, bind(&Server::acceptHandler, socket, _1));
+	acceptor.async_accept(*socket,
+						  bind(&Server::acceptHandler, this, socket, _1));
 }
 
 void Server::acceptHandler(socket_ptr socket,
@@ -75,8 +72,8 @@ void Server::readHandler(char *data, socket_ptr socket,
 		if (data[i] >= 'a' && data[i] <= 'z')
 			data[i] += 'A' - 'a';
 
-	socket->async_write_some(buffer(data, n),
-							 bind(writeHandler, data, socket, _1, _2));
+	socket->async_write_some(buffer(data, n), bind(&Server::writeHandler, this,
+												   data, socket, _1, _2));
 };
 void Server::writeHandler(char *data, socket_ptr socket,
 						  const boost::system::error_code &err, std::size_t n) {
@@ -86,8 +83,8 @@ void Server::writeHandler(char *data, socket_ptr socket,
 	}
 	cout << "write" << endl;
 
-	socket->async_read_some(buffer(data, 512),
-							bind(readHandler, data, socket, _1, _2));
+	socket->async_read_some(buffer(data, 512), bind(&Server::readHandler, this,
+													data, socket, _1, _2));
 };
 
 void Server::clientSession(socket_ptr socket, size_t index) {
@@ -96,8 +93,8 @@ void Server::clientSession(socket_ptr socket, size_t index) {
 	cout << "Client #" << index << " connected from "
 		 << socket->remote_endpoint().address().to_string() << endl;
 
-	socket->async_read_some(buffer(data, 512),
-							bind(readHandler, data, socket, _1, _2));
+	socket->async_read_some(buffer(data, 512), bind(&Server::readHandler, this,
+													data, socket, _1, _2));
 
 	// while (!exitServer.load()) {
 	//}

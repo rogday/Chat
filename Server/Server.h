@@ -13,24 +13,27 @@ using socket_ptr = std::shared_ptr<boost::asio::ip::tcp::socket>;
 
 class Server {
   private:
-	// static Server server;
-	static boost::asio::io_service service;
-	static boost::asio::ip::tcp::acceptor acceptor;
-	static std::atomic<bool> exitServer;
-	static std::list<socket_ptr> list;
+	static Server server;
+	boost::asio::io_service service;
+	boost::asio::ip::tcp::acceptor acceptor;
+	std::atomic<bool> exitServer;
+	std::list<socket_ptr> list;
 
   private:
-	Server(){};
+	Server() : acceptor(service){};
+	Server(const Server &);
+	void operator=(const Server &);
 
 	static void signalHandler(int);
-	static void startAccept(socket_ptr);
-	static void acceptHandler(socket_ptr, const boost::system::error_code &);
-	static void readHandler(char *, socket_ptr,
-							const boost::system::error_code &, std::size_t);
-	static void writeHandler(char *, socket_ptr,
-							 const boost::system::error_code &, std::size_t);
-	static void clientSession(socket_ptr, size_t);
+	void startAccept(socket_ptr);
+	void acceptHandler(socket_ptr, const boost::system::error_code &);
+	void readHandler(char *, socket_ptr, const boost::system::error_code &,
+					 std::size_t);
+	void writeHandler(char *, socket_ptr, const boost::system::error_code &,
+					  std::size_t);
+	void clientSession(socket_ptr, size_t);
 
   public:
-	static void startAtPort(int port);
+	static Server &getInstance() { return server; }
+	void startAtPort(int port);
 };
