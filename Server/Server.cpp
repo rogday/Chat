@@ -41,6 +41,7 @@ void Server::startAccept(socket_ptr socket) {
 void Server::acceptHandler(socket_ptr socket,
 						   const boost::system::error_code &error) {
 	if (error) {
+		std::lock_guard<std::mutex> guard(mutex);
 		std::cerr << "acceptHandler error: " << error << std::endl;
 		return; // replace that by something meaningful
 	}
@@ -60,12 +61,11 @@ void Server::acceptHandler(socket_ptr socket,
 void Server::readHandler(char *data, socket_ptr socket,
 						 const boost::system::error_code &err, std::size_t n) {
 	if (err) {
+		std::lock_guard<std::mutex> guard(mutex);
 		clientOnError(socket);
 		std::cerr << "readHandler error: " << err << std::endl;
 		return;
 	}
-
-	// std::cout << "read" << std::endl;
 
 	for (int i = 0; i < n; ++i)
 		if (data[i] >= 'a' && data[i] <= 'z')
@@ -78,11 +78,11 @@ void Server::readHandler(char *data, socket_ptr socket,
 void Server::writeHandler(char *data, socket_ptr socket,
 						  const boost::system::error_code &err, std::size_t n) {
 	if (err) {
+		std::lock_guard<std::mutex> guard(mutex);
 		clientOnError(socket);
 		std::cerr << "writeHandler error: " << err << std::endl;
 		return;
 	}
-	// std::cout << "write" << std::endl;
 
 	socket->async_read_some(
 		buffer(data, 512),
@@ -90,7 +90,12 @@ void Server::writeHandler(char *data, socket_ptr socket,
 };
 
 void Server::clientSession(socket_ptr socket) {
-	char *data = new char[512];
+	// actually this function should respect some API in terms of room
+	// assignation, but jesus, there is still no message class!
+
+	char *data = new char[512]; // temporary, I know, pointers are evil
+
+	std::lock_guard<std::mutex> guard(mutex);
 
 	std::cout << "New client: "
 			  << socket->remote_endpoint().address().to_string() << std::endl;
@@ -98,12 +103,10 @@ void Server::clientSession(socket_ptr socket) {
 	socket->async_read_some(
 		buffer(data, 512),
 		boost::bind(&Server::readHandler, this, data, socket, _1, _2));
-
-	// cout << "Connection interrupted on client #" << index << endl;
 }
 
 void Server::clientOnError(socket_ptr socket) {
 	--clients;
-	// do not try to access andpoit here, it's not connected,
+	// do not try to access endpoint here, it's not connected,
 	// so it will be an exception
 };

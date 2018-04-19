@@ -10,6 +10,7 @@
 #include <iostream>
 #include <list>
 #include <memory>
+#include <mutex>
 #include <thread>
 
 using socket_ptr = std::shared_ptr<boost::asio::ip::tcp::socket>;
@@ -26,6 +27,7 @@ class Server {
 	std::list<Room> rooms;
 
 	std::atomic<size_t> clients;
+	std::mutex mutex;
 
   private:
 	Server() : acceptor(service), clients(0){};
