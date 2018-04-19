@@ -45,7 +45,7 @@ void connect_handler(socket_ptr socket, const boost::system::error_code &ec) {
 			std::cout << std::endl << std::endl;
 
 			using namespace std::chrono_literals;
-			std::this_thread::sleep_for(2s);
+			// std::this_thread::sleep_for(2s);
 
 		} catch (std::exception &e) {
 			std::cout << "Something went wrong: " << e.what() << std::endl;

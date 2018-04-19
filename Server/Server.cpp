@@ -1,59 +1,57 @@
 #include "Server.h"
 
 using namespace boost::asio;
-using namespace std;
-using namespace std::placeholders;
 
 Server Server::server;
 
 void Server::signalHandler(int n) {
 	server.acceptor.close();
-	for (auto &socket : server.list)
-		socket->cancel();
-	server.exitServer.store(true);
+
+	for (auto &socket : server.roomless)
+		socket->close();
+
 	signal(n, signalHandler);
 };
 
 void Server::startAtPort(int port) {
-	exitServer.store(false);
 	signal(SIGINT, signalHandler);
 
 	ip::tcp::endpoint endpoint(ip::tcp::v4(), port);
-	service.restart();
 	acceptor.open(endpoint.protocol());
 	acceptor.bind(endpoint);
 	acceptor.listen();
 
-	cout << "Server is up." << endl;
+	std::cout << "Server is up." << std::endl;
 
 	socket_ptr socket(new ip::tcp::socket(service));
 	startAccept(socket);
 	service.run();
 
-	// for (auto &t : list)
-	//	t.join();
+	for (auto &tr : workers)
+		tr.join();
 
-	cout << "Server is down." << endl;
+	std::cout << "Server is down." << std::endl;
 }
 
 void Server::startAccept(socket_ptr socket) {
-	acceptor.async_accept(*socket,
-						  bind(&Server::acceptHandler, this, socket, _1));
+	acceptor.async_accept(
+		*socket, boost::bind(&Server::acceptHandler, this, socket, _1));
 }
 
 void Server::acceptHandler(socket_ptr socket,
 						   const boost::system::error_code &error) {
-	static size_t clients = 0;
-
 	if (error) {
-		cerr << "acceptHandler error: " << error << endl;
-		return;
+		std::cerr << "acceptHandler error: " << error << std::endl;
+		return; // replace that by something meaningful
 	}
 
 	++clients;
 
-	list.push_back(socket);
-	clientSession(socket, clients);
+	roomless.push_back(socket);
+	clientSession(socket);
+
+	if (clients > workers.size())
+		workers.emplace_back(boost::bind(&io_service::run, &service));
 
 	socket_ptr newSocket(new ip::tcp::socket(service));
 	startAccept(newSocket);
@@ -62,42 +60,50 @@ void Server::acceptHandler(socket_ptr socket,
 void Server::readHandler(char *data, socket_ptr socket,
 						 const boost::system::error_code &err, std::size_t n) {
 	if (err) {
-		cerr << "readHandler error: " << err << endl;
+		clientOnError(socket);
+		std::cerr << "readHandler error: " << err << std::endl;
 		return;
 	}
 
-	cout << "read" << endl;
+	// std::cout << "read" << std::endl;
 
 	for (int i = 0; i < n; ++i)
 		if (data[i] >= 'a' && data[i] <= 'z')
 			data[i] += 'A' - 'a';
 
-	socket->async_write_some(buffer(data, n), bind(&Server::writeHandler, this,
-												   data, socket, _1, _2));
+	socket->async_write_some(
+		buffer(data, n),
+		boost::bind(&Server::writeHandler, this, data, socket, _1, _2));
 };
 void Server::writeHandler(char *data, socket_ptr socket,
 						  const boost::system::error_code &err, std::size_t n) {
 	if (err) {
-		cerr << "writeHandler error: " << err << endl;
+		clientOnError(socket);
+		std::cerr << "writeHandler error: " << err << std::endl;
 		return;
 	}
-	cout << "write" << endl;
+	// std::cout << "write" << std::endl;
 
-	socket->async_read_some(buffer(data, 512), bind(&Server::readHandler, this,
-													data, socket, _1, _2));
+	socket->async_read_some(
+		buffer(data, 512),
+		boost::bind(&Server::readHandler, this, data, socket, _1, _2));
 };
 
-void Server::clientSession(socket_ptr socket, size_t index) {
+void Server::clientSession(socket_ptr socket) {
 	char *data = new char[512];
 
-	cout << "Client #" << index << " connected from "
-		 << socket->remote_endpoint().address().to_string() << endl;
+	std::cout << "New client: "
+			  << socket->remote_endpoint().address().to_string() << std::endl;
 
-	socket->async_read_some(buffer(data, 512), bind(&Server::readHandler, this,
-													data, socket, _1, _2));
-
-	// while (!exitServer.load()) {
-	//}
+	socket->async_read_some(
+		buffer(data, 512),
+		boost::bind(&Server::readHandler, this, data, socket, _1, _2));
 
 	// cout << "Connection interrupted on client #" << index << endl;
 }
+
+void Server::clientOnError(socket_ptr socket) {
+	--clients;
+	// do not try to access andpoit here, it's not connected,
+	// so it will be an exception
+};
