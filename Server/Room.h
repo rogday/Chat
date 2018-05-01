@@ -1,14 +1,26 @@
 #pragma once
 
+#include "Client.h"
+
+#include <list>
 #include <string>
 
 class Room {
   private:
-	// list of users probably?
-	// add method maybe?(who is in the room; notify everyone about newcommer)
-	// process() or something
-	std::string name;
+	std::list<std::shared_ptr<Client>> clients;
 
   public:
-	Room(std::string name) : name(name) {}
+	Room() {}
+	void add(std::shared_ptr<Client> newcommer) {
+		newcommer->on_read = [this](std::shared_ptr<Client> client) {
+			notifyAll(Client::Event::Text, client->getContent());
+		};
+		notifyAll(Client::Event::NewCommer, newcommer->nickname);
+		clients.push_back(newcommer);
+		newcommer->asyncRecieve();
+	}
+	void notifyAll(Client::Event type, std::string &str) {
+		for (auto it : clients)
+			it->asyncSend(type, str);
+	}
 };
