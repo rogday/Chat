@@ -7,7 +7,6 @@
 #include <csignal>
 #include <functional>
 #include <iostream>
-#include <list>
 #include <memory>
 #include <set>
 #include <unordered_map>

@@ -1,6 +1,5 @@
 #pragma once
 
-#include <algorithm>
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
 #include <cstdint>
@@ -23,9 +22,6 @@ class Client : public std::enable_shared_from_this<Client> {
 	bool authenticated;
 
 	socket_ptr sock;
-
-	uint64_t writeheader[2];
-	std::string writebuf;
 
 	uint64_t readheader[2];
 	std::string readbuf;

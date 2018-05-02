@@ -12,10 +12,10 @@ Server::Server() : acceptor(service), clients(0) {
 void Server::signalHandler(int n) {
 	server.acceptor.close();
 
-	for (auto room : server.rooms)
+	for (auto &room : server.rooms)
 		room.second.shutdown();
 
-	for (auto client : server.roomless)
+	for (auto &client : server.roomless)
 		client->shutdown();
 
 	signal(n, signalHandler);

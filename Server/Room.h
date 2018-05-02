@@ -11,6 +11,7 @@ class Room {
 
   public:
 	Room() {}
+
 	void add(std::shared_ptr<Client>);
 	void notifyAll(Client::Event, std::string &);
 	void shutdown();

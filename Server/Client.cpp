@@ -1,28 +1,34 @@
 #include "Client.h"
-#include "Room.h"
-#include "Server.h"
+
+#include <boost/shared_array.hpp>
 
 std::function<void(std::shared_ptr<Client>)> Client::on_auth = nullptr;
 std::function<void(std::shared_ptr<Client>)> Client::on_room = nullptr;
 
 void Client::asyncSend(Event type, std::string str) {
+	boost::shared_array<uint64_t> writeheader(new uint64_t[2]);
+	std::shared_ptr<std::string> writebuf(new std::string);
+
 	writeheader[0] = str.size();
 	writeheader[1] = type;
-	writebuf = str;
+	*writebuf = str;
 
+	// capturing buffers prevents them from releasing underlying memory
 	async_write(
-		*sock, boost::asio::buffer((char *)writeheader, sizeof writeheader),
+		*sock, boost::asio::buffer(writeheader.get(), sizeof readheader),
 		boost::asio::transfer_exactly(sizeof readheader),
-		[this](const boost::system::error_code &err, size_t n) {
+		[this, &writeheader, &writebuf](const boost::system::error_code &err,
+										size_t n) {
 			if (err) {
 				std::cerr << "header write error in client " << nickname
 						  << std::endl;
 				return;
 			}
 
-			async_write(*sock, boost::asio::buffer(writebuf),
+			async_write(*sock, boost::asio::buffer(*writebuf),
 						boost::asio::transfer_exactly(writeheader[0]),
-						[this](const boost::system::error_code &err, size_t n) {
+						[this, &writebuf](const boost::system::error_code &err,
+										  size_t n) {
 							if (err) {
 								std::cerr << "content write error in client "
 										  << nickname << std::endl;
