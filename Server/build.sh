@@ -1,2 +1,2 @@
 #!/bin/bash
-g++ -Wall -Wextra -O2 -lboost_system -lpthread $(dirname $0)/{Server,Room,main,Client}.cpp -o server
+g++ -D_GLIBCXX_DEBUG -Wall -Wextra -O2 $(dirname $0)/{Server,Room,main,Client}.cpp -o server -lboost_system -lpthread

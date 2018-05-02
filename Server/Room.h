@@ -11,7 +11,7 @@ class Room {
 	std::list<std::shared_ptr<Client>> clients;
 
   public:
-	Room() { std::cout << "Room()" << std::endl; }
+	Room() { std::cout << "New instance of Room." << std::endl; }
 
 	void add(std::shared_ptr<Client>);
 	void notifyAll(Client::Event, std::string &);

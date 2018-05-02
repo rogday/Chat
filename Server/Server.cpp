@@ -7,9 +7,9 @@ Server Server::server;
 Server::Server()
 	: acceptor(service), clients(0){
 							 //	Client::on_auth = std::bind(&Server::onAuth,
-							 //this, std::placeholders::_1);
+							 // this, std::placeholders::_1);
 							 //	Client::on_room = std::bind(&Server::onRoom,
-							 //this, std::placeholders::_1);
+							 // this, std::placeholders::_1);
 						 };
 
 void Server::signalHandler(int n) {
@@ -72,6 +72,8 @@ void Server::acceptHandler(socket_ptr socket,
 }
 
 void Server::onAuth(std::shared_ptr<Client> client) {
+	std::cout << "Auth: \'" << client->nickname << "\':\'" << client->password
+			  << '\'' << std::endl;
 	if (true)
 		client->setAuth();
 	client->asyncReceive();

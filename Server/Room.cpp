@@ -1,12 +1,15 @@
 #include "Room.h"
 
 void Room::add(std::shared_ptr<Client> newcommer) {
-	std::cout << "Newcommer in room \'" << newcommer->getContent() << "\': \'"
-			  << newcommer->nickname << '\'' << std::endl;
+	std::cout << "Room assignation: \'" << newcommer->nickname
+			  << "\' entered in \'" << newcommer->getContent() << '\''
+			  << std::endl;
+
 	newcommer->on_read = [this](std::shared_ptr<Client> client) {
 		std::cout << "New Message: " << client->getContent() << std::endl;
 		notifyAll(Client::Event::Text, client->getContent());
 	};
+
 	notifyAll(Client::Event::NewCommer, newcommer->nickname);
 	clients.push_back(newcommer);
 	newcommer->asyncReceive();
