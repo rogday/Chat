@@ -4,10 +4,19 @@ using namespace boost::asio;
 
 Server Server::server;
 
+Server::Server() : acceptor(service), clients(0) {
+	Client::on_auth = boost::bind(&Server::onAuth, this, _1);
+	Client::on_room = boost::bind(&Server::onRoom, this, _1);
+};
+
 void Server::signalHandler(int n) {
 	server.acceptor.close();
 
-	// for each room - shutdown
+	for (auto room : server.rooms)
+		room.second.shutdown();
+
+	for (auto client : server.roomless)
+		client->shutdown();
 
 	signal(n, signalHandler);
 };
@@ -15,6 +24,7 @@ void Server::signalHandler(int n) {
 void Server::startAtPort(int port) {
 	signal(SIGINT, signalHandler);
 
+	service.restart();
 	ip::tcp::endpoint endpoint(ip::tcp::v4(), port);
 	acceptor.open(endpoint.protocol());
 	acceptor.bind(endpoint);
@@ -24,12 +34,16 @@ void Server::startAtPort(int port) {
 
 	socket_ptr socket(new ip::tcp::socket(service));
 
-	acceptor.async_accept(
-		*socket, boost::bind(&Server::acceptHandler, this, socket, _1));
+	startAccept(socket);
 
 	service.run();
 
 	std::cout << "Server is down." << std::endl;
+}
+
+void Server::startAccept(socket_ptr socket) {
+	acceptor.async_accept(
+		*socket, boost::bind(&Server::acceptHandler, this, socket, _1));
 }
 
 void Server::acceptHandler(socket_ptr socket,
@@ -39,6 +53,8 @@ void Server::acceptHandler(socket_ptr socket,
 		return; // replace that by something meaningful
 	}
 
+	std::cout << "New Client from "
+			  << socket->remote_endpoint().address().to_string() << std::endl;
 	++clients;
 
 	auto ptr = std::make_shared<Client>(socket);
@@ -47,8 +63,7 @@ void Server::acceptHandler(socket_ptr socket,
 
 	socket_ptr newSocket(new ip::tcp::socket(service));
 
-	acceptor.async_accept(
-		*socket, boost::bind(&Server::acceptHandler, this, socket, _1));
+	startAccept(newSocket);
 }
 
 void Server::onAuth(std::shared_ptr<Client> client) {

@@ -26,16 +26,15 @@ class Server {
 	size_t clients;
 
   private:
-	Server() : acceptor(service), clients(0) {
-		Client::on_auth = boost::bind(&Server::onAuth, this, _1);
-		Client::on_room = boost::bind(&Server::onRoom, this, _1);
-	};
+	Server();
 	Server(const Server &);
 	void operator=(const Server &);
 
 	static void signalHandler(int);
 
 	void acceptHandler(socket_ptr, const boost::system::error_code &);
+	void startAccept(socket_ptr);
+
 	void onAuth(std::shared_ptr<Client>);
 	void onRoom(std::shared_ptr<Client>);
 
