@@ -4,10 +4,13 @@ using namespace boost::asio;
 
 Server Server::server;
 
-Server::Server() : acceptor(service), clients(0) {
-	Client::on_auth = boost::bind(&Server::onAuth, this, _1);
-	Client::on_room = boost::bind(&Server::onRoom, this, _1);
-};
+Server::Server()
+	: acceptor(service), clients(0){
+							 //	Client::on_auth = std::bind(&Server::onAuth,
+							 //this, std::placeholders::_1);
+							 //	Client::on_room = std::bind(&Server::onRoom,
+							 //this, std::placeholders::_1);
+						 };
 
 void Server::signalHandler(int n) {
 	server.acceptor.close();
@@ -59,6 +62,8 @@ void Server::acceptHandler(socket_ptr socket,
 
 	auto ptr = std::make_shared<Client>(socket);
 	roomless.insert(ptr);
+	ptr->on_auth = std::bind(&Server::onAuth, this, std::placeholders::_1);
+	ptr->on_room = std::bind(&Server::onRoom, this, std::placeholders::_1);
 	ptr->asyncReceive();
 
 	socket_ptr newSocket(new ip::tcp::socket(service));

@@ -2,8 +2,8 @@
 
 #include <boost/shared_array.hpp>
 
-std::function<void(std::shared_ptr<Client>)> Client::on_auth = nullptr;
-std::function<void(std::shared_ptr<Client>)> Client::on_room = nullptr;
+// std::function<void(std::shared_ptr<Client>)> Client::on_auth = nullptr;
+// std::function<void(std::shared_ptr<Client>)> Client::on_room = nullptr;
 
 void Client::asyncSend(Event type, std::string str) {
 	boost::shared_array<uint64_t> writeheader(new uint64_t[2]);
@@ -20,8 +20,8 @@ void Client::asyncSend(Event type, std::string str) {
 		[this, &writeheader, &writebuf](const boost::system::error_code &err,
 										size_t n) {
 			if (err) {
-				std::cerr << "header write error in client " << nickname
-						  << std::endl;
+				std::cerr << "header write error in client \'" << nickname
+						  << "\': " << err << std::endl;
 				return;
 			}
 
@@ -30,8 +30,9 @@ void Client::asyncSend(Event type, std::string str) {
 						[this, &writebuf](const boost::system::error_code &err,
 										  size_t n) {
 							if (err) {
-								std::cerr << "content write error in client "
-										  << nickname << std::endl;
+								std::cerr << "content write error in client \'"
+										  << nickname << "\': " << err
+										  << std::endl;
 								return;
 							}
 						});
@@ -44,8 +45,8 @@ void Client::asyncReceive() {
 		boost::asio::transfer_exactly(sizeof readheader),
 		[this](const boost::system::error_code &err, size_t n) {
 			if (err) {
-				std::cerr << "header read error in client " << nickname
-						  << std::endl;
+				std::cerr << "header read error in client \'" << nickname
+						  << "\': " << err << std::endl;
 				return;
 			}
 
@@ -54,16 +55,20 @@ void Client::asyncReceive() {
 					   boost::asio::transfer_exactly(readheader[0]),
 					   [this](const boost::system::error_code &err, size_t n) {
 						   if (err) {
-							   std::cerr << "content read error in client "
-										 << nickname << std::endl;
+							   std::cerr << "content read error in client \'"
+										 << nickname << "\': " << err
+										 << std::endl;
+							   return;
 						   }
 						   switch (readheader[1]) {
 						   case Text:
+							   std::cout << "Incoming Text" << std::endl;
 							   if (authenticated && on_read != nullptr)
 								   on_read(shared_from_this());
 
 							   break;
 						   case Auth:
+							   std::cout << "Incoming Auth" << std::endl;
 							   if (!authenticated) {
 								   size_t ind = readbuf.find(':');
 								   nickname.resize(ind);
@@ -73,10 +78,14 @@ void Client::asyncReceive() {
 								   std::copy_n(readbuf.begin() + ind + 1,
 											   password.size(),
 											   password.begin());
+								   if (on_auth == nullptr)
+									   std::cerr << "da fuk?" << std::endl;
 								   on_auth(shared_from_this());
 							   }
 							   break;
 						   case Room:
+							   std::cout << "Incoming Room assignation request"
+										 << std::endl;
 							   if (authenticated)
 								   on_room(shared_from_this());
 

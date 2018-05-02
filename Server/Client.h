@@ -12,11 +12,11 @@ using socket_ptr = std::shared_ptr<boost::asio::ip::tcp::socket>;
 
 class Client : public std::enable_shared_from_this<Client> {
   public:
-	enum Event { Text, Auth, Room, NewCommer };
+	enum Event { Text = 0, Auth, Room, NewCommer };
 
 	std::function<void(std::shared_ptr<Client>)> on_read;
-	static std::function<void(std::shared_ptr<Client>)> on_auth;
-	static std::function<void(std::shared_ptr<Client>)> on_room;
+	std::function<void(std::shared_ptr<Client>)> on_auth;
+	std::function<void(std::shared_ptr<Client>)> on_room;
 
   private:
 	bool authenticated;
