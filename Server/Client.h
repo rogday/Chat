@@ -34,7 +34,7 @@ class Client : public std::enable_shared_from_this<Client> {
 	Client(socket_ptr sock) : authenticated(false), sock(sock) {}
 
 	void asyncSend(Event, std::string);
-	void asyncRecieve();
+	void asyncReceive();
 	void shutdown() {
 		sock->cancel();
 		sock->close();

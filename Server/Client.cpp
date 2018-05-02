@@ -38,7 +38,7 @@ void Client::asyncSend(Event type, std::string str) {
 		});
 }
 
-void Client::asyncRecieve() {
+void Client::asyncReceive() {
 	async_read(
 		*sock, boost::asio::buffer((char *)readheader, sizeof readheader),
 		boost::asio::transfer_exactly(sizeof readheader),

@@ -6,7 +6,7 @@ void Room::add(std::shared_ptr<Client> newcommer) {
 	};
 	notifyAll(Client::Event::NewCommer, newcommer->nickname);
 	clients.push_back(newcommer);
-	newcommer->asyncRecieve();
+	newcommer->asyncReceive();
 }
 
 void Room::notifyAll(Client::Event type, std::string &str) {

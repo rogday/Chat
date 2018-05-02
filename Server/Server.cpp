@@ -59,7 +59,7 @@ void Server::acceptHandler(socket_ptr socket,
 
 	auto ptr = std::make_shared<Client>(socket);
 	roomless.insert(ptr);
-	ptr->asyncRecieve();
+	ptr->asyncReceive();
 
 	socket_ptr newSocket(new ip::tcp::socket(service));
 
@@ -69,7 +69,7 @@ void Server::acceptHandler(socket_ptr socket,
 void Server::onAuth(std::shared_ptr<Client> client) {
 	if (true)
 		client->setAuth();
-	client->asyncRecieve();
+	client->asyncReceive();
 }
 
 void Server::onRoom(std::shared_ptr<Client> client) {
