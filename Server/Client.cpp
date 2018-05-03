@@ -19,7 +19,6 @@ void Client::send() {
 		writeheader[1] = tmp.first;
 		writebuf = tmp.second;
 
-		// capturing buffers prevents them from releasing underlying memory
 		async_write(
 			*sock, boost::asio::buffer((char *)writeheader, sizeof writeheader),
 			boost::asio::transfer_exactly(sizeof writeheader),

@@ -8,6 +8,7 @@ void Room::add(std::shared_ptr<Client> newcommer) {
 	newcommer->on_read = [this](std::shared_ptr<Client> client) {
 		std::cout << "New Message: " << client->getContent() << std::endl;
 		notifyAll(Client::Event::Text, client->getContent());
+		client->asyncReceive();
 	};
 
 	notifyAll(Client::Event::NewCommer, newcommer->nickname);
