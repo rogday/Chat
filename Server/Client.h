@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <functional>
 #include <iostream>
+#include <list>
 #include <memory>
 #include <string>
 
@@ -25,6 +26,14 @@ class Client : public std::enable_shared_from_this<Client> {
 
 	uint64_t readheader[2];
 	std::string readbuf;
+
+	uint64_t writeheader[2];
+	std::string writebuf;
+
+	std::list<std::pair<Event, std::string>> msgQueue;
+
+  private:
+	void send();
 
   public:
 	std::string nickname;

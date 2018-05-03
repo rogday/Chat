@@ -4,37 +4,47 @@
 // std::function<void(std::shared_ptr<Client>)> Client::on_room = nullptr;
 
 void Client::asyncSend(Event type, std::string str) {
-	std::shared_ptr<uint64_t[]> writeheader(new uint64_t[2]);
-	std::shared_ptr<std::string> writebuf(new std::string);
+	bool empty = msgQueue.empty();
 
-	writeheader[0] = str.size();
-	writeheader[1] = type;
-	*writebuf = str;
+	msgQueue.emplace_back(type, str);
+	if (empty)
+		send();
+}
 
-	// capturing buffers prevents them from releasing underlying memory
-	async_write(
-		*sock, boost::asio::buffer(writeheader.get(), sizeof readheader),
-		boost::asio::transfer_exactly(sizeof readheader),
-		[this, writeheader, writebuf](const boost::system::error_code &err,
-									  size_t n) {
-			if (err) {
-				std::cerr << "header write error in client \'" << nickname
-						  << "\': " << err << std::endl;
-				return;
-			}
+void Client::send() {
+	if (!msgQueue.empty()) {
+		auto tmp = msgQueue.front();
 
-			async_write(*sock, boost::asio::buffer(*writebuf),
-						boost::asio::transfer_exactly(writeheader[0]),
-						[this, writebuf](const boost::system::error_code &err,
-										 size_t n) {
-							if (err) {
-								std::cerr << "content write error in client \'"
-										  << nickname << "\': " << err
-										  << std::endl;
-								return;
-							}
-						});
-		});
+		writeheader[0] = tmp.second.size();
+		writeheader[1] = tmp.first;
+		writebuf = tmp.second;
+
+		// capturing buffers prevents them from releasing underlying memory
+		async_write(
+			*sock, boost::asio::buffer((char *)writeheader, sizeof writeheader),
+			boost::asio::transfer_exactly(sizeof writeheader),
+			[this](const boost::system::error_code &err, size_t n) {
+				if (err) {
+					std::cerr << "header write error in client \'" << nickname
+							  << "\': " << err << std::endl;
+					return;
+				}
+
+				async_write(
+					*sock, boost::asio::buffer(writebuf),
+					boost::asio::transfer_exactly(writeheader[0]),
+					[this](const boost::system::error_code &err, size_t n) {
+						if (err) {
+							std::cerr << "content write error in client \'"
+									  << nickname << "\': " << err << std::endl;
+							return;
+						}
+
+						msgQueue.pop_front();
+						send();
+					});
+			});
+	}
 }
 
 void Client::asyncReceive() {
