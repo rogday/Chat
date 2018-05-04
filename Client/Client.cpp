@@ -1,82 +1,131 @@
-#include <boost/asio.hpp>
-#include <boost/shared_array.hpp>
-#include <iostream>
-#include <memory>
+#include "Client.h"
 
 using namespace boost::asio;
-using socket_ptr =
-	std::shared_ptr<ip::tcp::socket>; // try to figure out how to
-									  // replace by unique, coz idk
 
-enum Event { Text = 0, Auth, Room, NewCommer };
+Client Client::client;
 
-uint64_t readheader[2];
-std::string readbuf;
+void Client::threadfunc() {
+	std::string name;
 
-void asyncSend(socket_ptr sock, Event type, std::string str) {
-	boost::shared_array<uint64_t> writeheader(new uint64_t[2]);
-	std::shared_ptr<std::string> writebuf(new std::string);
+	while (std::getline(std::cin, name))
+		asyncSend(Client::Event::ClientAPI, name);
+}
 
-	writeheader[0] = str.size();
-	writeheader[1] = type;
-	*writebuf = str;
+void Client::start(char *ip, int port) {
+	signal(SIGINT, signalHandler);
 
-	// capturing buffers prevents them from releasing underlying memory
-	async_write(
-		*sock, boost::asio::buffer(writeheader.get(), sizeof readheader),
+	ip::tcp::endpoint ep(ip::address::from_string(ip), port);
+
+	socket.async_connect(
+		ep, std::bind(&Client::connect_handler, this, std::placeholders::_1));
+
+	service.run();
+}
+
+void Client::connect_handler(const boost::system::error_code &ec) {
+	if (ec)
+		return;
+
+	std::string nickname, password, room;
+
+	std::cout << "Connected.\nLogin: ";
+	std::getline(std::cin, nickname);
+	std::cout << "Password: ";
+	std::getline(std::cin, password);
+	std::cout << "Room name: ";
+	std::getline(std::cin, room);
+
+	asyncSend(Auth, nickname + ':' + password);
+	asyncSend(Room, room, [this]() {
+		std::thread tr(&Client::threadfunc, this);
+		tr.detach();
+	});
+
+	asyncRecieve();
+}
+
+void Client::signalHandler(int n) {
+	client.shutdown();
+
+	signal(n, signalHandler);
+}
+
+void Client::asyncSend(Event type, std::string str,
+					   std::function<void(void)> func) {
+	bool empty = msgQueue.empty();
+
+	msgQueue.emplace_back(type, str, func);
+	if (empty)
+		send();
+}
+
+void Client::send() {
+	if (!msgQueue.empty()) {
+		auto tmp = msgQueue.front();
+
+		writeheader[0] = std::get<1>(tmp).size();
+		writeheader[1] = std::get<0>(tmp);
+		writebuf = std::get<1>(tmp);
+		auto f = std::get<2>(tmp);
+
+		async_write(
+			socket,
+			boost::asio::buffer((char *)writeheader, sizeof writeheader),
+			boost::asio::transfer_exactly(sizeof writeheader),
+			[this, f](const boost::system::error_code &err, size_t n) {
+				if (err) {
+					std::cerr << "header write error: " << err << std::endl;
+					return;
+				}
+
+				async_write(
+					socket, boost::asio::buffer(writebuf),
+					boost::asio::transfer_exactly(writeheader[0]),
+					[this, f](const boost::system::error_code &err, size_t n) {
+						if (err) {
+							std::cerr << "content write error: " << err
+									  << std::endl;
+							return;
+						}
+
+						msgQueue.pop_front();
+
+						if (f != nullptr)
+							f();
+
+						send();
+					});
+			});
+	}
+}
+
+void Client::asyncRecieve() {
+	async_read(
+		socket, boost::asio::buffer((char *)readheader, sizeof readheader),
 		boost::asio::transfer_exactly(sizeof readheader),
-		[sock, writeheader, writebuf](const boost::system::error_code &err,
-									  size_t n) {
+		[this](const boost::system::error_code &err, size_t n) {
 			if (err) {
-				std::cerr << "header write error: " << err << std::endl;
+				std::cerr << "header read error in client " << nickname
+						  << std::endl;
 				return;
 			}
-			std::cout << "Header for " << writeheader[1] << " sent."
-					  << std::endl;
 
-			async_write(*sock, boost::asio::buffer(*writebuf),
-						boost::asio::transfer_exactly(writeheader[0]),
-						[sock, writeheader, writebuf](
-							const boost::system::error_code &err, size_t n) {
-							if (err) {
-								std::cerr << "content write error: " << err
-										  << std::endl;
-								return;
-							}
-							std::cout
-								<< "Body for " << writeheader[1] << " sent to "
-								<< sock->remote_endpoint().address().to_string()
-								<< std::endl;
-						});
+			readbuf.resize(readheader[0]);
+			async_read(socket, boost::asio::buffer(readbuf),
+					   boost::asio::transfer_exactly(readheader[0]),
+					   [this](const boost::system::error_code &err, size_t n) {
+						   if (err) {
+							   std::cerr << "content read error in client "
+										 << nickname << std::endl;
+							   return;
+						   }
+						   if (readheader[1] >= ClientAPI) {
+							   // there you can be sure that it's message from
+							   // another client and add your own API for files,
+							   // music, voice, etc
+							   std::cerr << readbuf << std::endl;
+						   }
+						   asyncRecieve();
+					   });
 		});
-}
-
-void connect_handler(socket_ptr socket, const boost::system::error_code &ec) {
-	if (ec) {
-		std::cerr << "connect error: " << ec << std::endl;
-		return;
-	}
-
-	std::cout << "connected" << std::endl;
-
-	asyncSend(socket, Auth, "rogday:password");
-	asyncSend(socket, Room, "Motherfuckers");
-	asyncSend(socket, Text, "Sup, guys?");
-}
-
-int main(int argc, char *argv[]) {
-	char *ip = argv[1];
-	int port = atoi(argv[2]);
-
-	io_service service;
-	ip::tcp::endpoint ep(ip::address::from_string(ip), port);
-	socket_ptr socket(new ip::tcp::socket(service));
-
-	socket->async_connect(
-		ep, std::bind(connect_handler, socket, std::placeholders::_1));
-	service.run();
-
-	std::cout << "dying" << std::endl;
-
-	return 0;
 }

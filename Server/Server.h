@@ -14,6 +14,8 @@
 using socket_ptr = std::shared_ptr<boost::asio::ip::tcp::socket>;
 
 class Server {
+	friend Client;
+
   private:
 	static Server server;
 
@@ -36,6 +38,7 @@ class Server {
 
 	void onAuth(std::shared_ptr<Client>);
 	void onRoom(std::shared_ptr<Client>);
+	void onError(std::shared_ptr<Client>);
 
   public:
 	inline static Server &getInstance() { return server; }

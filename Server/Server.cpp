@@ -62,8 +62,11 @@ void Server::acceptHandler(socket_ptr socket,
 
 	auto ptr = std::make_shared<Client>(socket);
 	roomless.insert(ptr);
-	ptr->on_auth = std::bind(&Server::onAuth, this, std::placeholders::_1);
-	ptr->on_room = std::bind(&Server::onRoom, this, std::placeholders::_1);
+
+	// ptr->on_auth = std::bind(&Server::onAuth, this, std::placeholders::_1);
+	// ptr->on_room = std::bind(&Server::onRoom, this, std::placeholders::_1);
+	ptr->on_error = std::bind(&Server::onError, this, std::placeholders::_1);
+
 	ptr->asyncReceive();
 
 	socket_ptr newSocket(new ip::tcp::socket(service));
@@ -74,12 +77,19 @@ void Server::acceptHandler(socket_ptr socket,
 void Server::onAuth(std::shared_ptr<Client> client) {
 	std::cout << "Auth: \'" << client->nickname << "\':\'" << client->password
 			  << '\'' << std::endl;
-	if (true)
+	if (true) {
+		client->asyncSend(Client::Event::Auth, "T");
 		client->setAuth();
-	client->asyncReceive();
+	} else {
+		client->asyncSend(Client::Event::Auth, "F");
+	}
+}
+
+void Server::onError(std::shared_ptr<Client> client) {
+	roomless.erase(roomless.find(client));
 }
 
 void Server::onRoom(std::shared_ptr<Client> client) {
-	roomless.erase(roomless.find(client));
+	onError(client);
 	rooms[client->getContent()].add(client);
 }

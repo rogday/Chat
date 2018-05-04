@@ -3,17 +3,21 @@
 #include "Client.h"
 
 #include <iostream>
-#include <list>
+#include <set>
 #include <string>
 
 class Room {
   private:
-	std::list<std::shared_ptr<Client>> clients;
+	std::set<std::shared_ptr<Client>> clients;
 
   public:
 	Room() { std::cout << "New instance of Room." << std::endl; }
 
 	void add(std::shared_ptr<Client>);
-	void notifyAll(Client::Event, std::string &);
+
+	void onRead(std::shared_ptr<Client> client);
+	void notifyAll(Client::Event, std::string);
+
+	void erase(std::shared_ptr<Client>);
 	void shutdown();
 };
