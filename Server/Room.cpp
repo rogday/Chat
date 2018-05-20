@@ -8,7 +8,14 @@ void Room::add(std::shared_ptr<Client> newcommer) {
 	newcommer->on_read = boost::bind(&Room::onRead, this, _1);
 	newcommer->on_error = boost::bind(&Room::erase, this, _1);
 
+	std::string online;
+
+	for (auto it : clients)
+		online += it->nickname + ":";
+
+	newcommer->asyncSend(Client::Event::Room, online);
 	notifyAll(Client::Event::NewCommer, newcommer->nickname);
+
 	clients.insert(newcommer);
 }
 
@@ -29,6 +36,7 @@ void Room::notifyAll(Client::Event type, std::string str) {
 }
 
 void Room::erase(std::shared_ptr<Client> client) {
+	notifyAll(Client::Event::NewCommer, client->nickname);
 	clients.erase(clients.find(client));
 }
 

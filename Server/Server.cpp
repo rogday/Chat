@@ -78,7 +78,11 @@ void Server::onAuth(std::shared_ptr<Client> client) {
 	std::cout << "Auth: \'" << client->nickname << "\':\'" << client->password
 			  << '\'' << std::endl;
 	if (true) {
-		client->asyncSend(Client::Event::Auth, "T");
+		std::string list = "T";
+		for (auto &[name, room] : rooms)
+			list += name + ":";
+
+		client->asyncSend(Client::Event::Auth, list);
 		client->setAuth();
 	} else {
 		client->asyncSend(Client::Event::Auth, "F");
