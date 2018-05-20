@@ -72,29 +72,30 @@ void Client::send() {
 			socket,
 			boost::asio::buffer((char *)writeheader, sizeof writeheader),
 			boost::asio::transfer_exactly(sizeof writeheader),
-			[this, f](const boost::system::error_code &err, size_t n) {
+			[this, f](const boost::system::error_code &err,
+					  [[maybe_unused]] size_t n) {
 				if (err) {
 					std::cerr << "header write error: " << err << std::endl;
 					return;
 				}
 
-				async_write(
-					socket, boost::asio::buffer(writebuf),
-					boost::asio::transfer_exactly(writeheader[0]),
-					[this, f](const boost::system::error_code &err, size_t n) {
-						if (err) {
-							std::cerr << "content write error: " << err
-									  << std::endl;
-							return;
-						}
+				async_write(socket, boost::asio::buffer(writebuf),
+							boost::asio::transfer_exactly(writeheader[0]),
+							[this, f](const boost::system::error_code &err,
+									  [[maybe_unused]] size_t n) {
+								if (err) {
+									std::cerr << "content write error: " << err
+											  << std::endl;
+									return;
+								}
 
-						msgQueue.pop_front();
+								msgQueue.pop_front();
 
-						if (f != nullptr)
-							f();
+								if (f != nullptr)
+									f();
 
-						send();
-					});
+								send();
+							});
 			});
 	}
 }
@@ -103,7 +104,8 @@ void Client::asyncRecieve() {
 	async_read(
 		socket, boost::asio::buffer((char *)readheader, sizeof readheader),
 		boost::asio::transfer_exactly(sizeof readheader),
-		[this](const boost::system::error_code &err, size_t n) {
+		[this](const boost::system::error_code &err,
+			   [[maybe_unused]] size_t n) {
 			if (err) {
 				std::cerr << "header read error in client " << nickname
 						  << std::endl;
@@ -113,18 +115,24 @@ void Client::asyncRecieve() {
 			readbuf.resize(readheader[0]);
 			async_read(socket, boost::asio::buffer(readbuf),
 					   boost::asio::transfer_exactly(readheader[0]),
-					   [this](const boost::system::error_code &err, size_t n) {
+					   [this](const boost::system::error_code &err,
+							  [[maybe_unused]] size_t n) {
 						   if (err) {
 							   std::cerr << "content read error in client "
 										 << nickname << std::endl;
 							   return;
 						   }
+
 						   if (readheader[1] >= ClientAPI) {
 							   // there you can be sure that it's message from
 							   // another client and add your own API for files,
 							   // music, voice, etc
 							   std::cerr << readbuf << std::endl;
-						   }
+						   } else
+							   std::cerr
+								   << "Unimplemented feature: " << readheader[1]
+								   << ' ' << readbuf << std::endl;
+
 						   asyncRecieve();
 					   });
 		});

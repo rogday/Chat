@@ -36,8 +36,8 @@ void Room::notifyAll(Client::Event type, std::string str) {
 }
 
 void Room::erase(std::shared_ptr<Client> client) {
-	notifyAll(Client::Event::NewCommer, client->nickname);
 	clients.erase(clients.find(client));
+	notifyAll(Client::Event::NewCommer, client->nickname);
 }
 
 void Room::shutdown() {
