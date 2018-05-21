@@ -28,7 +28,7 @@ class Client {
 	uint64_t writeheader[2];
 	std::string writebuf;
 
-    std::list<std::tuple<Event, std::string>> msgQueue;
+	std::list<std::tuple<Event, std::string>> msgQueue;
 
   private:
 	static void signalHandler(int);
@@ -43,7 +43,7 @@ class Client {
 	std::function<void(std::string)> on_room;
 
 	std::function<void(std::string)> on_read;
-    std::function<void(std::string)> on_newcommer;
+	std::function<void(std::string)> on_newcommer;
 	std::function<void()> on_error;
 
 	std::string nickname;
@@ -53,7 +53,7 @@ class Client {
 	Client() : socket(service){};
 
 	void connect(char *, int);
-    void asyncSend(Event, std::string);
+	void asyncSend(Event, std::string);
 
 	inline static Client &getInstance() { return client; };
 
