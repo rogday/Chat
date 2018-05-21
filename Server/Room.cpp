@@ -36,11 +36,13 @@ void Room::notifyAll(Client::Event type, std::string str) {
 }
 
 void Room::erase(std::shared_ptr<Client> client) {
-	clients.erase(clients.find(client));
+	clients.erase(clients.find(client)); // careful pls
 	notifyAll(Client::Event::NewCommer, client->nickname);
 }
 
 void Room::shutdown() {
-	for (auto it : clients)
+	for (auto it : clients) {
+		it->on_error = [](auto) {}; // ignore errors
 		it->shutdown();
+	}
 }

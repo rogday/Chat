@@ -26,11 +26,10 @@ void Client::signalHandler(int n) {
 	signal(n, signalHandler);
 }
 
-void Client::asyncSend(Event type, std::string str,
-					   std::function<void(void)> func) {
+void Client::asyncSend(Event type, std::string str) {
 	bool empty = msgQueue.empty();
 
-	msgQueue.emplace_back(type, str, func);
+    msgQueue.emplace_back(type, str);
 	if (empty)
 		send();
 }
@@ -41,14 +40,13 @@ void Client::send() {
 
 		writeheader[0] = std::get<1>(tmp).size();
 		writeheader[1] = std::get<0>(tmp);
-		writebuf = std::get<1>(tmp);
-		auto f = std::get<2>(tmp);
+        writebuf = std::get<1>(tmp);
 
 		async_write(
 			socket,
 			boost::asio::buffer((char *)writeheader, sizeof writeheader),
 			boost::asio::transfer_exactly(sizeof writeheader),
-			[this, f](const boost::system::error_code &err,
+            [this](const boost::system::error_code &err,
 					  [[maybe_unused]] size_t n) {
 				if (err) {
 					std::cerr << "header write error: " << err << std::endl;
@@ -57,7 +55,7 @@ void Client::send() {
 
 				async_write(socket, boost::asio::buffer(writebuf),
 							boost::asio::transfer_exactly(writeheader[0]),
-							[this, f](const boost::system::error_code &err,
+                            [this](const boost::system::error_code &err,
 									  [[maybe_unused]] size_t n) {
 								if (err) {
 									std::cerr << "content write error: " << err
@@ -66,10 +64,6 @@ void Client::send() {
 								}
 
 								msgQueue.pop_front();
-
-								if (f != nullptr)
-									f();
-
 								send();
 							});
 			});
@@ -118,7 +112,7 @@ void Client::startRecieving() {
 										  on_room(readbuf);
 										  break;
 									  case NewCommer:
-										  // on_newcommer STFU
+                                          on_newcommer(readbuf);
 										  break;
 									  default:
 										  std::cerr << "Unimplemented feature: "
