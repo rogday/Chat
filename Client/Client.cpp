@@ -118,6 +118,7 @@ void Client::startRecieving() {
 										  on_room(readbuf);
 										  break;
 									  case NewCommer:
+										  // on_newcommer STFU
 										  break;
 									  default:
 										  std::cerr << "Unimplemented feature: "

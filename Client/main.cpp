@@ -43,6 +43,9 @@ int main(int argc, char *argv[]) {
 	client.connect(ip, port);
 
 	client.login = [&client]() {
+		// CleanLoginScene.show()
+		// .on_submit = asyncSend(Auth);
+
 		std::string nickname, password;
 
 		std::cout << "Connected.\nLogin: ";
@@ -54,6 +57,9 @@ int main(int argc, char *argv[]) {
 	};
 
 	client.on_auth = [&client](std::string list) {
+		// EnterRoomScene.show(rooms)
+		// .on_submit = asyncSend(Room);
+
 		std::cout << "Available rooms: " << std::endl;
 
 		std::list<std::string> lst;
@@ -73,6 +79,9 @@ int main(int argc, char *argv[]) {
 	};
 
 	client.on_room = [&client](std::string list) {
+		// ChatScene(users)
+		// .on_send = asyncSend(ClientAPI);
+
 		std::cout << "Users online: " << std::endl;
 
 		std::list<std::string> lst;
@@ -83,6 +92,7 @@ int main(int argc, char *argv[]) {
 	};
 
 	client.on_read = [&client](std::string mes) {
+		// ChatScene.add(msg)
 		std::cerr << mes << std::endl;
 	};
 
