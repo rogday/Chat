@@ -4,44 +4,20 @@ using namespace boost::asio;
 
 Client Client::client;
 
-void Client::threadfunc() {
-	std::string name;
-
-	while (std::getline(std::cin, name))
-		asyncSend(Client::Event::ClientAPI, name);
-}
-
-void Client::start(char *ip, int port) {
+void Client::connect(char *ip, int port) {
 	signal(SIGINT, signalHandler);
 
 	ip::tcp::endpoint ep(ip::address::from_string(ip), port);
 
 	socket.async_connect(
 		ep, std::bind(&Client::connect_handler, this, std::placeholders::_1));
-
-	service.run();
 }
 
 void Client::connect_handler(const boost::system::error_code &ec) {
 	if (ec)
 		return;
 
-	std::string nickname, password, room;
-
-	std::cout << "Connected.\nLogin: ";
-	std::getline(std::cin, nickname);
-	std::cout << "Password: ";
-	std::getline(std::cin, password);
-	std::cout << "Room name: ";
-	std::getline(std::cin, room);
-
-	asyncSend(Auth, nickname + ':' + password);
-	asyncSend(Room, room, [this]() {
-		std::thread tr(&Client::threadfunc, this);
-		tr.detach();
-	});
-
-	asyncRecieve();
+	startRecieving();
 }
 
 void Client::signalHandler(int n) {
@@ -100,40 +76,56 @@ void Client::send() {
 	}
 }
 
-void Client::asyncRecieve() {
-	async_read(
-		socket, boost::asio::buffer((char *)readheader, sizeof readheader),
-		boost::asio::transfer_exactly(sizeof readheader),
-		[this](const boost::system::error_code &err,
-			   [[maybe_unused]] size_t n) {
-			if (err) {
-				std::cerr << "header read error in client " << nickname
-						  << std::endl;
-				return;
-			}
+void Client::startRecieving() {
+	async_read(socket,
+			   boost::asio::buffer((char *)readheader, sizeof readheader),
+			   boost::asio::transfer_exactly(sizeof readheader),
+			   [this](const boost::system::error_code &err,
+					  [[maybe_unused]] size_t n) {
+				   if (err) {
+					   std::cerr << "header read error in client " << nickname
+								 << std::endl;
+					   return;
+				   }
 
-			readbuf.resize(readheader[0]);
-			async_read(socket, boost::asio::buffer(readbuf),
-					   boost::asio::transfer_exactly(readheader[0]),
-					   [this](const boost::system::error_code &err,
-							  [[maybe_unused]] size_t n) {
-						   if (err) {
-							   std::cerr << "content read error in client "
-										 << nickname << std::endl;
-							   return;
-						   }
+				   readbuf.resize(readheader[0]);
+				   async_read(socket, boost::asio::buffer(readbuf),
+							  boost::asio::transfer_exactly(readheader[0]),
+							  [this](const boost::system::error_code &err,
+									 [[maybe_unused]] size_t n) {
+								  if (err) {
+									  std::cerr
+										  << "content read error in client "
+										  << nickname << std::endl;
+									  return;
+								  }
 
-						   if (readheader[1] >= ClientAPI) {
-							   // there you can be sure that it's message from
-							   // another client and add your own API for files,
-							   // music, voice, etc
-							   std::cerr << readbuf << std::endl;
-						   } else
-							   std::cerr
-								   << "Unimplemented feature: " << readheader[1]
-								   << ' ' << readbuf << std::endl;
+								  if (readheader[1] >= ClientAPI) {
+									  on_read(readbuf);
+									  // there you can be sure that it's message
+									  // from another client and add your own
+									  // API for files, music, voice, etc
+								  } else
+									  switch (readheader[1]) {
+									  case Auth:
+										  if (readbuf[0] == 'F')
+											  login();
+										  else {
+											  on_auth(readbuf.substr(1));
+										  }
+										  break;
+									  case Room:
+										  on_room(readbuf);
+										  break;
+									  case NewCommer:
+										  break;
+									  default:
+										  std::cerr << "Unimplemented feature: "
+													<< readheader[1] << ' '
+													<< readbuf << std::endl;
+									  }
 
-						   asyncRecieve();
-					   });
-		});
+								  startRecieving();
+							  });
+			   });
 }

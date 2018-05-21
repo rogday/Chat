@@ -27,26 +27,36 @@ class Client {
 	std::string writebuf;
 
 	std::list<std::tuple<Event, std::string, std::function<void()>>> msgQueue;
-	void threadfunc();
+
+  private:
+	static void signalHandler(int);
+
+	void startRecieving();
+	void connect_handler(const boost::system::error_code &ec);
+	void send();
 
   public:
+	std::function<void()> login;
+	std::function<void(std::string)> on_auth;
+	std::function<void(std::string)> on_room;
+
+	std::function<void(std::string)> on_read;
+	std::function<void()> on_error;
+
 	std::string nickname;
 	std::string password;
 
   public:
 	Client() : socket(service){};
 
-	void send();
-
+	void connect(char *, int);
 	void asyncSend(Event, std::string, std::function<void()> = nullptr);
-	void asyncRecieve();
-	static void signalHandler(int);
+
 	inline static Client &getInstance() { return client; };
+
+	void run() { service.run(); }
 	void shutdown() {
 		socket.cancel();
 		socket.close();
 	};
-
-	void start(char *, int);
-	void connect_handler(const boost::system::error_code &ec);
 };

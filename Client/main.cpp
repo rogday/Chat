@@ -1,5 +1,22 @@
 #include "Client.h"
 
+// copypasted
+template <typename Out>
+void split(const std::string &s, char delim, Out result) {
+	std::stringstream ss(s);
+	std::string item;
+	while (std::getline(ss, item, delim)) {
+		*(result++) = item;
+	}
+}
+
+void inputProcess(Client &client) {
+	std::string name;
+
+	while (std::getline(std::cin, name))
+		client.asyncSend(Client::Event::ClientAPI, name);
+}
+
 int main(int argc, char *argv[]) {
 	if (argc < 2) {
 		std::cerr << "Wrong number of parameters!" << std::endl;
@@ -22,8 +39,55 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 
-	Client &leha = Client::getInstance();
-	leha.start(ip, port);
+	Client &client = Client::getInstance();
+	client.connect(ip, port);
+
+	client.login = [&client]() {
+		std::string nickname, password;
+
+		std::cout << "Connected.\nLogin: ";
+		std::getline(std::cin, nickname);
+		std::cout << "Password: ";
+		std::getline(std::cin, password);
+
+		client.asyncSend(Client::Event::Auth, nickname + ':' + password);
+	};
+
+	client.on_auth = [&client](std::string list) {
+		std::cout << "Available rooms: " << std::endl;
+
+		std::list<std::string> lst;
+		split(list, ':', std::back_inserter(lst));
+
+		for (auto &item : lst)
+			std::cout << item << std::endl;
+
+		std::string room;
+		std::cout << "Room name: ";
+		std::getline(std::cin, room);
+
+		client.asyncSend(Client::Event::Room, room, [&client]() {
+			std::thread tr(inputProcess, std::ref(client));
+			tr.detach();
+		});
+	};
+
+	client.on_room = [&client](std::string list) {
+		std::cout << "Users online: " << std::endl;
+
+		std::list<std::string> lst;
+		split(list, ':', std::back_inserter(lst));
+
+		for (auto &item : lst)
+			std::cout << item << std::endl;
+	};
+
+	client.on_read = [&client](std::string mes) {
+		std::cerr << mes << std::endl;
+	};
+
+	client.login();
+	client.run();
 
 	std::cout << "dying" << std::endl;
 
