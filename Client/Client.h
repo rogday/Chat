@@ -38,6 +38,7 @@ class Client {
 	void send();
 
   public:
+	std::function<void()> connect;
 	std::function<void()> login;
 	std::function<void(std::string)> on_auth;
 	std::function<void(std::string)> on_room;
@@ -52,7 +53,7 @@ class Client {
   public:
 	Client() : socket(service){};
 
-	void connect(char *, int);
+	void connectToServer(std::string, int);
 	void asyncSend(Event, std::string);
 
 	inline static Client &getInstance() { return client; };

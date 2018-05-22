@@ -4,7 +4,7 @@ using namespace boost::asio;
 
 Client Client::client;
 
-void Client::connect(char *ip, int port) {
+void Client::connectToServer(std::string ip, int port) {
 	signal(SIGINT, signalHandler);
 
 	ip::tcp::endpoint ep(ip::address::from_string(ip), port);
@@ -14,10 +14,13 @@ void Client::connect(char *ip, int port) {
 }
 
 void Client::connect_handler(const boost::system::error_code &ec) {
-	if (ec)
-		return;
-
-	startRecieving();
+	if (ec) {
+		std::cout << "connect error: " << ec << std::endl;
+		on_error();
+	} else {
+		login();
+		startRecieving();
+	}
 }
 
 void Client::signalHandler(int n) {
@@ -50,6 +53,7 @@ void Client::send() {
 				   [[maybe_unused]] size_t n) {
 				if (err) {
 					std::cerr << "header write error: " << err << std::endl;
+					on_error();
 					return;
 				}
 
@@ -60,6 +64,7 @@ void Client::send() {
 								if (err) {
 									std::cerr << "content write error: " << err
 											  << std::endl;
+									on_error();
 									return;
 								}
 
@@ -77,8 +82,8 @@ void Client::startRecieving() {
 			   [this](const boost::system::error_code &err,
 					  [[maybe_unused]] size_t n) {
 				   if (err) {
-					   std::cerr << "header read error in client " << nickname
-								 << std::endl;
+					   std::cerr << "header read error: " << err << std::endl;
+					   on_error();
 					   return;
 				   }
 
@@ -88,9 +93,9 @@ void Client::startRecieving() {
 							  [this](const boost::system::error_code &err,
 									 [[maybe_unused]] size_t n) {
 								  if (err) {
-									  std::cerr
-										  << "content read error in client "
-										  << nickname << std::endl;
+									  std::cerr << "content read error: " << err
+												<< std::endl;
+									  on_error();
 									  return;
 								  }
 

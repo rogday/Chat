@@ -21,6 +21,8 @@ class MainWindow : public QMainWindow {
 	void on_submit_clicked();
 	void on_submit_2_clicked();
 
+	void on_connect_clicked();
+
   private:
 	Ui::MainWindow *ui;
 	Client &client = Client::getInstance();

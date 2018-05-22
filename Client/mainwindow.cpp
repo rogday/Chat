@@ -17,7 +17,14 @@ MainWindow::MainWindow(QWidget *parent)
 	: QMainWindow(parent), ui(new Ui::MainWindow) {
 	ui->setupUi(this);
 
-	client.connect("127.0.0.1", 6666);
+	client.connect = [this]() {
+		ui->ip->clear();
+		ui->port->clear();
+
+		ui->stack->setCurrentWidget(ui->server);
+	};
+
+	client.on_error = client.connect;
 
 	client.login = [this]() {
 		ui->login->clear();
@@ -48,6 +55,7 @@ MainWindow::MainWindow(QWidget *parent)
 
 	client.on_read = [this](std::string mes) {
 		ui->history->addItem(QString::fromStdString(mes));
+		ui->history->scrollToBottom();
 	};
 
 	client.on_newcommer = [this](std::string nickname) {
@@ -68,9 +76,7 @@ MainWindow::MainWindow(QWidget *parent)
 		}
 	};
 
-	client.login();
-	std::thread tr(&Client::run, &client);
-	tr.detach();
+	client.connect();
 }
 
 MainWindow::~MainWindow() { delete ui; }
@@ -101,4 +107,12 @@ void MainWindow::on_submit_clicked() {
 void MainWindow::on_submit_2_clicked() {
 	client.asyncSend(Client::Event::Room,
 					 ui->roomname->toPlainText().toStdString());
+}
+
+void MainWindow::on_connect_clicked() {
+	client.connectToServer(ui->ip->toPlainText().toStdString(),
+						   ui->port->toPlainText().toInt());
+
+	std::thread tr(&Client::run, &client);
+	tr.detach();
 }
