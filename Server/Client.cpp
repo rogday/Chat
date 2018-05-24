@@ -1,7 +1,7 @@
 #include "Client.h"
 #include "Server.h"
 
-std::function<void(std::shared_ptr<Client>)> Client::on_auth =
+std::function<bool(std::shared_ptr<Client>)> Client::on_auth =
 	std::bind(&Server::onAuth, &Server::getInstance(), std::placeholders::_1);
 ;
 std::function<void(std::shared_ptr<Client>)> Client::on_room =
@@ -28,8 +28,7 @@ void Client::send() {
 		async_write(
 			*sock, boost::asio::buffer((char *)writeheader, sizeof writeheader),
 			boost::asio::transfer_exactly(sizeof writeheader),
-			[this, self](const boost::system::error_code &err,
-						 [[maybe_unused]] size_t n) {
+			[this, self](const boost::system::error_code &err, size_t) {
 				if (err) {
 					std::cerr << "header write error in client \'" << nickname
 							  << "\': " << err << std::endl;
@@ -38,22 +37,20 @@ void Client::send() {
 					return;
 				}
 
-				async_write(*sock, boost::asio::buffer(writebuf),
-							boost::asio::transfer_exactly(writeheader[0]),
-							[this, self](const boost::system::error_code &err,
-										 [[maybe_unused]] size_t n) {
-								if (err) {
-									std::cerr
-										<< "content write error in client \'"
-										<< nickname << "\': " << err
-										<< std::endl;
-									on_error(self);
-									return;
-								}
+				async_write(
+					*sock, boost::asio::buffer(writebuf),
+					boost::asio::transfer_exactly(writeheader[0]),
+					[this, self](const boost::system::error_code &err, size_t) {
+						if (err) {
+							std::cerr << "content write error in client \'"
+									  << nickname << "\': " << err << std::endl;
+							on_error(self);
+							return;
+						}
 
-								msgQueue.pop_front();
-								send();
-							});
+						msgQueue.pop_front();
+						send();
+					});
 			});
 	}
 }
@@ -61,74 +58,61 @@ void Client::send() {
 void Client::asyncReceive() {
 	auto self = shared_from_this();
 
-	async_read(*sock,
-			   boost::asio::buffer((char *)readheader, sizeof readheader),
-			   boost::asio::transfer_exactly(sizeof readheader),
-			   [this, self](const boost::system::error_code &err,
-							[[maybe_unused]] size_t n) {
-				   if (err) {
-					   std::cerr << "header read error in client \'" << nickname
-								 << "\': " << err << std::endl;
-					   on_error(self);
-					   return;
-				   }
+	async_read(
+		*sock, boost::asio::buffer((char *)readheader, sizeof readheader),
+		boost::asio::transfer_exactly(sizeof readheader),
+		[this, self](const boost::system::error_code &err, size_t) {
+			if (err) {
+				std::cerr << "header read error in client \'" << nickname
+						  << "\': " << err << std::endl;
+				on_error(self);
+				return;
+			}
 
-				   readbuf.resize(readheader[0]);
-				   async_read(*sock, boost::asio::buffer(readbuf),
-							  boost::asio::transfer_exactly(readheader[0]),
-							  [this, self](const boost::system::error_code &err,
-										   [[maybe_unused]] size_t n) {
-								  if (err) {
-									  std::cerr
-										  << "content read error in client \'"
-										  << nickname << "\': " << err
-										  << std::endl;
-									  on_error(self);
-									  return;
-								  }
+			readbuf.resize(readheader[0]);
+			async_read(
+				*sock, boost::asio::buffer(readbuf),
+				boost::asio::transfer_exactly(readheader[0]),
+				[this, self](const boost::system::error_code &err, size_t) {
+					if (err) {
+						std::cerr << "content read error in client \'"
+								  << nickname << "\': " << err << std::endl;
+						on_error(self);
+						return;
+					}
 
-								  retranslator((Event)readheader[1], readbuf);
-								  asyncReceive();
-							  });
-			   });
+					handler((Event)readheader[1], readbuf);
+					asyncReceive();
+				});
+		});
 }
 
-void Client::retranslator(Event type, std::string &str) {
-	/*
-		Implement some kind of graph - initial point will be Auth - if received
-	   packet is not Auth, then drop it, if user:pass is not in the base - drop
-	   it, otherwise change current point to room, and so on.
-	*/
-	auto self = shared_from_this();
+void Client::Authentication(Event type, std::string &str) {
+	if (type != Auth)
+		return;
 
-	if (type >= ClientAPI) {
-		if (authenticated && on_read != nullptr)
-			on_read(self);
-	} else
-		switch (type) {
-		case Auth:
-			if (!authenticated) {
-				size_t ind = str.find(':');
+	size_t ind = str.find(':');
 
-				if (ind == std::string::npos)
-					break;
+	if (ind == std::string::npos)
+		return;
 
-				nickname.resize(ind);
-				password.resize(str.size() - ind - 1);
+	nickname.resize(ind);
+	password.resize(str.size() - ind - 1);
 
-				std::copy_n(str.begin(), nickname.size(), nickname.begin());
-				std::copy_n(str.begin() + ind + 1, password.size(),
-							password.begin());
+	std::copy_n(str.begin(), nickname.size(), nickname.begin());
+	std::copy_n(str.begin() + ind + 1, password.size(), password.begin());
 
-				on_auth(self);
-			}
-			break;
-		case Room:
-			if (authenticated)
-				on_room(self);
+	if (on_auth(shared_from_this()))
+		handler = [this](auto type, auto &) {
+			if (type != Room)
+				return;
 
-			break;
-		default:
-			break;
+			on_room(shared_from_this());
+			handler = [this](auto type, auto &mes) {
+				if (type < ClientAPI)
+					return;
+
+				on_read(shared_from_this(), mes);
+			};
 		};
 }

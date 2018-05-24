@@ -1,6 +1,6 @@
 #pragma once
 
-#include "Room.h" //not implemented yet
+#include "Room.h"
 
 #include <boost/asio.hpp>
 #include <boost/bind.hpp>
@@ -14,7 +14,7 @@
 using socket_ptr = std::shared_ptr<boost::asio::ip::tcp::socket>;
 
 class Server {
-	friend Client;
+	friend Client; // allow client class access callbacks
 
   private:
 	static Server server;
@@ -24,23 +24,22 @@ class Server {
 
 	std::unordered_map<std::string, Room> rooms;
 	std::set<std::shared_ptr<Client>> roomless;
-	size_t clients;
 
   private:
 	Server();
-	Server(const Server &);
-	void operator=(const Server &);
-
-	static void signalHandler(int);
+	Server(const Server &) = delete;
+	void operator=(const Server &) = delete;
 
 	void acceptHandler(socket_ptr, const boost::system::error_code &);
 	void startAccept(socket_ptr);
 
-	void onAuth(std::shared_ptr<Client>);
+	bool onAuth(std::shared_ptr<Client>);
 	void onRoom(std::shared_ptr<Client>);
 	void onError(std::shared_ptr<Client>);
 
+	static void signalHandler(int);
+
   public:
-	inline static Server &getInstance() { return server; }
+	constexpr inline static Server &getInstance() { return server; }
 	void startAtPort(int port);
 };

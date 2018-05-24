@@ -15,14 +15,13 @@ class Client : public std::enable_shared_from_this<Client> {
   public:
 	enum Event { Auth, Room, NewCommer, ClientAPI };
 
-	static std::function<void(std::shared_ptr<Client>)> on_auth;
-	static std::function<void(std::shared_ptr<Client>)> on_room;
-
-	std::function<void(std::shared_ptr<Client>)> on_read;
+	std::function<void(std::shared_ptr<Client>, std::string &)> on_read;
 	std::function<void(std::shared_ptr<Client>)> on_error;
 
   private:
-	bool authenticated;
+	static std::function<bool(std::shared_ptr<Client>)> on_auth;
+	static std::function<void(std::shared_ptr<Client>)> on_room;
+	std::function<void(Event, std::string &)> handler;
 
 	socket_ptr sock;
 
@@ -36,23 +35,26 @@ class Client : public std::enable_shared_from_this<Client> {
 
   private:
 	void send();
-	void retranslator(Event, std::string &);
+	void Authentication(Event, std::string &);
 
   public:
 	std::string nickname;
 	std::string password;
 
   public:
-	Client(socket_ptr sock) : authenticated(false), sock(sock) {}
+	Client(socket_ptr sock) : sock(sock) {
+		handler = boost::bind(&Client::Authentication, this, _1, _2);
+	}
 
 	void asyncSend(Event, std::string);
 	void asyncReceive();
 	void shutdown() {
-		sock->cancel();
-		sock->close();
+		if (sock->is_open()) {
+			sock->cancel();
+			sock->close();
+		}
 	}
 
-	inline void setAuth() { authenticated = true; }
 	inline std::string &getContent() { return readbuf; }
 	inline Event getType() { return (Event)readheader[1]; }
 };

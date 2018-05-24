@@ -5,7 +5,7 @@ void Room::add(std::shared_ptr<Client> newcommer) {
 			  << "\' entered in \'" << newcommer->getContent() << '\''
 			  << std::endl;
 
-	newcommer->on_read = boost::bind(&Room::onRead, this, _1);
+	newcommer->on_read = boost::bind(&Room::onRead, this, _1, _2);
 	newcommer->on_error = boost::bind(&Room::erase, this, _1);
 
 	std::string online;
@@ -19,20 +19,13 @@ void Room::add(std::shared_ptr<Client> newcommer) {
 	clients.insert(newcommer);
 }
 
-void Room::onRead(std::shared_ptr<Client> client) {
-	// std::cout << "New Message: " << client->getContent() << std::endl;
-
-	notifyAll(client->getType(),
-			  client->nickname + "> " + client->getContent());
+void Room::onRead(std::shared_ptr<Client> client, std::string &str) {
+	notifyAll(client->getType(), client->nickname + "> " + str);
 };
 
 void Room::notifyAll(Client::Event type, std::string str) {
-	// std::cout << "Notifying..." << std::endl;
-	for (auto it : clients) {
-		//	std::cout << "client: " << it->nickname << std::endl;
+	for (auto it : clients)
 		it->asyncSend(type, str);
-	}
-	// std::cout << "The end." << std::endl;
 }
 
 void Room::erase(std::shared_ptr<Client> client) {

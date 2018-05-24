@@ -15,7 +15,7 @@ class Room {
 
 	void add(std::shared_ptr<Client>);
 
-	void onRead(std::shared_ptr<Client> client);
+	void onRead(std::shared_ptr<Client>, std::string &);
 	void notifyAll(Client::Event, std::string);
 
 	void erase(std::shared_ptr<Client>);

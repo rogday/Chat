@@ -21,9 +21,6 @@ int main(int argc, char *argv[]) {
 		return -1;
 	}
 
-	// probably UB here: detached threads checking global variable [fixed]
-	// TODO: async read\write, since threads get stiuck on read [fixed]
-
 	Server &srv = Server::getInstance();
 	srv.startAtPort(port);
 

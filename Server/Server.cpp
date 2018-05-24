@@ -4,15 +4,9 @@ using namespace boost::asio;
 
 Server Server::server;
 
-Server::Server()
-	: acceptor(service), clients(0){
-							 //	Client::on_auth = std::bind(&Server::onAuth,
-							 // this, std::placeholders::_1);
-							 //	Client::on_room = std::bind(&Server::onRoom,
-							 // this, std::placeholders::_1);
-						 };
+Server::Server() : acceptor(service){};
 
-void Server::signalHandler(int n) {
+void Server::signalHandler(int) {
 	server.acceptor.close();
 
 	for (auto &room : server.rooms)
@@ -20,23 +14,22 @@ void Server::signalHandler(int n) {
 
 	for (auto &client : server.roomless)
 		client->shutdown();
-
-	signal(n, signalHandler);
 };
 
 void Server::startAtPort(int port) {
 	signal(SIGINT, signalHandler);
 
-	service.restart();
 	ip::tcp::endpoint endpoint(ip::tcp::v4(), port);
+	socket_base::reuse_address option(true);
+
 	acceptor.open(endpoint.protocol());
+	acceptor.set_option(option);
 	acceptor.bind(endpoint);
 	acceptor.listen();
 
 	std::cout << "Server's up." << std::endl;
 
 	socket_ptr socket(new ip::tcp::socket(service));
-
 	startAccept(socket);
 
 	service.run();
@@ -53,20 +46,17 @@ void Server::acceptHandler(socket_ptr socket,
 						   const boost::system::error_code &error) {
 	if (error) {
 		std::cerr << "acceptHandler error: " << error << std::endl;
-		return; // replace that by something meaningful
+		signalHandler(SIGINT);
+		return;
 	}
 
 	std::cout << "New Client from "
 			  << socket->remote_endpoint().address().to_string() << std::endl;
-	++clients;
 
 	auto ptr = std::make_shared<Client>(socket);
 	roomless.insert(ptr);
 
-	// ptr->on_auth = std::bind(&Server::onAuth, this, std::placeholders::_1);
-	// ptr->on_room = std::bind(&Server::onRoom, this, std::placeholders::_1);
-	ptr->on_error = std::bind(&Server::onError, this, std::placeholders::_1);
-
+	ptr->on_error = boost::bind(&Server::onError, this, _1);
 	ptr->asyncReceive();
 
 	socket_ptr newSocket(new ip::tcp::socket(service));
@@ -74,7 +64,7 @@ void Server::acceptHandler(socket_ptr socket,
 	startAccept(newSocket);
 }
 
-void Server::onAuth(std::shared_ptr<Client> client) {
+bool Server::onAuth(std::shared_ptr<Client> client) {
 	std::cout << "Auth: \'" << client->nickname << "\':\'" << client->password
 			  << '\'' << std::endl;
 	if (true) {
@@ -83,10 +73,10 @@ void Server::onAuth(std::shared_ptr<Client> client) {
 			list += name + ":";
 
 		client->asyncSend(Client::Event::Auth, list);
-		client->setAuth();
-	} else {
-		client->asyncSend(Client::Event::Auth, "F");
+		return true;
 	}
+	client->asyncSend(Client::Event::Auth, "F");
+	return false;
 }
 
 void Server::onError(std::shared_ptr<Client> client) {
