@@ -16,9 +16,9 @@ void Client::connectToServer(std::string ip, int port) {
 void Client::connect_handler(const boost::system::error_code &ec) {
 	if (ec) {
 		std::cout << "connect error: " << ec << std::endl;
-		on_error();
+        emit error();
 	} else {
-		login();
+        emit login();
 		startRecieving();
 	}
 }
@@ -49,22 +49,20 @@ void Client::send() {
 			socket,
 			boost::asio::buffer((char *)writeheader, sizeof writeheader),
 			boost::asio::transfer_exactly(sizeof writeheader),
-			[this](const boost::system::error_code &err,
-				   [[maybe_unused]] size_t n) {
+            [this](const boost::system::error_code &err, size_t) {
 				if (err) {
 					std::cerr << "header write error: " << err << std::endl;
-					on_error();
+                    emit error();
 					return;
 				}
 
 				async_write(socket, boost::asio::buffer(writebuf),
 							boost::asio::transfer_exactly(writeheader[0]),
-							[this](const boost::system::error_code &err,
-								   [[maybe_unused]] size_t n) {
+                            [this](const boost::system::error_code &err, size_t) {
 								if (err) {
 									std::cerr << "content write error: " << err
 											  << std::endl;
-									on_error();
+                                    emit error();
 									return;
 								}
 
@@ -79,28 +77,26 @@ void Client::startRecieving() {
 	async_read(socket,
 			   boost::asio::buffer((char *)readheader, sizeof readheader),
 			   boost::asio::transfer_exactly(sizeof readheader),
-			   [this](const boost::system::error_code &err,
-					  [[maybe_unused]] size_t n) {
+               [this](const boost::system::error_code &err, size_t) {
 				   if (err) {
 					   std::cerr << "header read error: " << err << std::endl;
-					   on_error();
+                       emit error();
 					   return;
 				   }
 
 				   readbuf.resize(readheader[0]);
 				   async_read(socket, boost::asio::buffer(readbuf),
 							  boost::asio::transfer_exactly(readheader[0]),
-							  [this](const boost::system::error_code &err,
-									 [[maybe_unused]] size_t n) {
+                              [this](const boost::system::error_code &err, size_t) {
 								  if (err) {
 									  std::cerr << "content read error: " << err
 												<< std::endl;
-									  on_error();
+                                      emit error();
 									  return;
 								  }
 
 								  if (readheader[1] >= ClientAPI) {
-									  on_read(readbuf);
+                                      emit read(readbuf);
 									  // there you can be sure that it's message
 									  // from another client and add your own
 									  // API for files, music, voice, etc
@@ -108,16 +104,16 @@ void Client::startRecieving() {
 									  switch (readheader[1]) {
 									  case Auth:
 										  if (readbuf[0] == 'F')
-											  login();
+                                              emit login();
 										  else {
-											  on_auth(readbuf.substr(1));
+                                              emit auth(readbuf.substr(1));
 										  }
 										  break;
 									  case Room:
-										  on_room(readbuf);
+                                          emit room(readbuf);
 										  break;
 									  case NewCommer:
-										  on_newcommer(readbuf);
+                                          emit newcommer(readbuf);
 										  break;
 									  default:
 										  std::cerr << "Unimplemented feature: "

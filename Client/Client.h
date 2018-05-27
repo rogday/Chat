@@ -11,8 +11,11 @@
 #include <list>
 #include <string>
 #include <thread>
+#include <QObject>
 
-class Client {
+class Client: public QObject {
+    Q_OBJECT
+
   public:
 	enum Event { Auth, Room, NewCommer, ClientAPI };
 
@@ -37,15 +40,17 @@ class Client {
 	void connect_handler(const boost::system::error_code &ec);
 	void send();
 
-  public:
-	std::function<void()> connect;
-	std::function<void()> login;
-	std::function<void(std::string)> on_auth;
-	std::function<void(std::string)> on_room;
+  signals:
+    void login();
 
-	std::function<void(std::string)> on_read;
-	std::function<void(std::string)> on_newcommer;
-	std::function<void()> on_error;
+    void auth(std::string);
+    void room(std::string);
+
+    void read(std::string);
+    void newcommer(std::string);
+    void error();
+
+  public:
 
 	std::string nickname;
 	std::string password;

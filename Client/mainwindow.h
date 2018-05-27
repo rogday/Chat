@@ -16,12 +16,22 @@ class MainWindow : public QMainWindow {
 	~MainWindow();
 
   private slots:
+    void on_connect_clicked();
+
+    void on_submit_clicked();
+    void on_submit_2_clicked();
+
 	void on_send_clicked();
 	void on_entry_blockCountChanged(int newBlockCount);
-	void on_submit_clicked();
-	void on_submit_2_clicked();
 
-	void on_connect_clicked();
+  public slots:
+    void showConnect();
+    void showLogin();
+    void showRooms(std::string);
+    void showChat(std::string);
+
+    void newMes(std::string);
+    void newUserlist(std::string);
 
   private:
 	Ui::MainWindow *ui;
