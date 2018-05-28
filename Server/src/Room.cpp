@@ -1,5 +1,10 @@
 #include "Room.h"
 
+#include <boost/bind.hpp>
+#include <iostream>
+
+Room::Room() { std::cout << "New instance of Room." << std::endl; }
+
 void Room::add(std::shared_ptr<Client> newcommer) {
 	std::cout << "Room assignation: \'" << newcommer->nickname
 			  << "\' entered somewhere" << std::endl;

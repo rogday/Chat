@@ -1,5 +1,9 @@
 #include "Server.h"
 
+#include <boost/bind.hpp>
+#include <csignal>
+#include <iostream>
+
 using namespace boost::asio;
 
 Server Server::server;

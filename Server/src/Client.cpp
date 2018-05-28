@@ -1,13 +1,21 @@
 #include "Client.h"
 #include "Server.h"
 
-#include <memory>
+#include <boost/bind.hpp>
+#include <cstdint>
+#include <iostream>
 
 std::function<bool(std::shared_ptr<Client>)> Client::on_auth =
 	boost::bind(&Server::onAuth, &Server::getInstance(), _1);
 ;
 std::function<void(std::shared_ptr<Client>, std::string)> Client::on_room =
 	boost::bind(&Server::onRoom, &Server::getInstance(), _1, _2);
+
+Client::Client(boost::asio::ip::tcp::socket &&sock) : sock(std::move(sock)) {
+	handler = boost::bind(&Client::Authentication, this, _1, _2);
+}
+
+Client::~Client() { std::cout << "Client went out of scope." << std::endl; }
 
 void Client::asyncSend(Event type, std::string str) {
 	auto header = std::make_unique<uint64_t[]>(2);
@@ -116,4 +124,11 @@ void Client::Authentication(Event type, std::string str) {
 				on_read(shared_from_this(), type, mes);
 			};
 		};
+}
+
+void Client::shutdown() {
+	if (sock.is_open()) {
+		sock.cancel();
+		sock.close();
+	}
 }

@@ -2,7 +2,7 @@
 
 #include "Client.h"
 
-#include <iostream>
+#include <memory>
 #include <set>
 #include <string>
 
@@ -11,7 +11,7 @@ class Room {
 	std::set<std::shared_ptr<Client>> clients;
 
   public:
-	Room() { std::cout << "New instance of Room." << std::endl; }
+	Room();
 
 	void add(std::shared_ptr<Client>);
 
