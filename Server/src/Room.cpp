@@ -1,13 +1,14 @@
 #include "Room.h"
+#include "Utils.h"
 
 #include <boost/bind.hpp>
 #include <iostream>
 
-Room::Room() { std::cout << "New instance of Room." << std::endl; }
+Room::Room() { Utils::Info << "New instance of Room." << std::endl; }
 
 void Room::add(std::shared_ptr<Client> newcommer) {
-	std::cout << "Room assignation: \'" << newcommer->nickname
-			  << "\' entered somewhere" << std::endl;
+	Utils::Success << "Room assignation: \'" << newcommer->nickname
+				   << "\' entered somewhere" << std::endl;
 
 	newcommer->on_read = boost::bind(&Room::onRead, this, _1, _2, _3);
 	newcommer->on_error = boost::bind(&Room::erase, this, _1);
@@ -17,8 +18,8 @@ void Room::add(std::shared_ptr<Client> newcommer) {
 	for (auto it : clients)
 		online += it->nickname + ":";
 
-	newcommer->asyncSend(Client::Event::Room, online);
-	notifyAll(Client::Event::NewCommer, newcommer->nickname);
+	newcommer->asyncSend(Client::Room, online);
+	notifyAll(Client::NewCommer, newcommer->nickname);
 
 	clients.insert(newcommer);
 }
@@ -35,7 +36,7 @@ void Room::notifyAll(Client::Event type, std::string str) {
 
 void Room::erase(std::shared_ptr<Client> client) {
 	clients.erase(clients.find(client)); // careful pls
-	notifyAll(Client::Event::NewCommer, client->nickname);
+	notifyAll(Client::NewCommer, client->nickname);
 }
 
 void Room::shutdown() {

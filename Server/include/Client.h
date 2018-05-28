@@ -7,7 +7,8 @@
 
 class Client : public std::enable_shared_from_this<Client> {
   public:
-	enum Event { Auth, Room, NewCommer, ClientAPI };
+	using Event = uint64_t;
+	enum { Auth, Room, NewCommer, ClientAPI };
 
 	std::function<void(std::shared_ptr<Client>, Event, std::string &)> on_read;
 	std::function<void(std::shared_ptr<Client>)> on_error;
@@ -33,7 +34,7 @@ class Client : public std::enable_shared_from_this<Client> {
 	~Client();
 
 	void asyncSend(Event, std::string);
-	void asyncReceive();
+	void startReceive();
 
 	void shutdown();
 };

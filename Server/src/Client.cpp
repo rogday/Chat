@@ -1,5 +1,6 @@
 #include "Client.h"
 #include "Server.h"
+#include "Utils.h"
 
 #include <boost/bind.hpp>
 #include <cstdint>
@@ -15,48 +16,29 @@ Client::Client(boost::asio::ip::tcp::socket &&sock) : sock(std::move(sock)) {
 	handler = boost::bind(&Client::Authentication, this, _1, _2);
 }
 
-Client::~Client() { std::cout << "Client went out of scope." << std::endl; }
+Client::~Client() { Utils::Info << "Client went out of scope." << std::endl; }
 
 void Client::asyncSend(Event type, std::string str) {
-	auto header = std::make_unique<uint64_t[]>(2);
-	auto buf = std::make_unique<std::string>(str);
-	auto ptr = header.get();
-
-	header[0] = str.size();
-	header[1] = type;
-
+	uint64_t n = str.size();
+	auto buf = std::make_unique<std::string>(Utils::toStr(n) +
+											 Utils::toStr(type) + str);
 	auto self = shared_from_this();
+	auto ptr = buf.get();
 
-	async_write(sock, boost::asio::buffer((char *)ptr, 16),
-				boost::asio::transfer_exactly(16),
-				[this, self, header = std::move(header), buf = std::move(buf)](
-					const boost::system::error_code &err, size_t) mutable {
+	async_write(sock, boost::asio::buffer(ptr->data(), ptr->size()),
+				boost::asio::transfer_exactly(ptr->size()),
+				[this, self, buf = std::move(buf)](
+					const boost::system::error_code &err, size_t) {
 					if (err) {
-						std::cerr << "header write error in client \'"
-								  << nickname << "\': " << err << std::endl;
-
+						Utils::Error << "write error in client \'" << nickname
+									 << "\': " << err << std::endl;
 						on_error(self);
 						return;
 					}
-
-					auto ptr = buf.get();
-					async_write(
-						sock, boost::asio::buffer(ptr->data(), ptr->size()),
-						boost::asio::transfer_exactly(ptr->size()),
-						[this, self, buf = std::move(buf)](
-							const boost::system::error_code &err, size_t) {
-							if (err) {
-								std::cerr << "content write error in client \'"
-										  << nickname << "\': " << err
-										  << std::endl;
-								on_error(self);
-								return;
-							}
-						});
 				});
 }
 
-void Client::asyncReceive() {
+void Client::startReceive() {
 	auto header = std::make_unique<uint64_t[]>(2);
 	auto self = shared_from_this();
 	auto ptr = header.get();
@@ -67,9 +49,9 @@ void Client::asyncReceive() {
 		[this, self, header = std::move(header)](
 			const boost::system::error_code &err, size_t) mutable {
 			if (err || (header[0] > (1 << 20))) {
-				std::cerr << "header read error in client \'" << nickname
-						  << "\': " << err << "; size: " << header[0]
-						  << std::endl;
+				Utils::Error << "header read error in client \'" << nickname
+							 << "\': " << err << "; size: " << header[0]
+							 << std::endl;
 				on_error(self);
 				return;
 			}
@@ -84,14 +66,14 @@ void Client::asyncReceive() {
 				[this, self, header = std::move(header), buf = std::move(buf)](
 					const boost::system::error_code &err, size_t) {
 					if (err) {
-						std::cerr << "content read error in client \'"
-								  << nickname << "\': " << err << std::endl;
+						Utils::Error << "content read error in client \'"
+									 << nickname << "\': " << err << std::endl;
 						on_error(self);
 						return;
 					}
 
 					handler((Event)header[1], *buf);
-					asyncReceive();
+					startReceive();
 				});
 		});
 }

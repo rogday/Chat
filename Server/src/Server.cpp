@@ -1,4 +1,5 @@
 #include "Server.h"
+#include "Utils.h"
 
 #include <boost/bind.hpp>
 #include <csignal>
@@ -31,48 +32,48 @@ void Server::startAtPort(int port) {
 	acceptor.bind(endpoint);
 	acceptor.listen();
 
-	std::cout << "Server's up." << std::endl;
+	Utils::Info << "Server's up." << std::endl;
 
 	acceptor.async_accept(socket,
 						  boost::bind(&Server::acceptHandler, this, _1));
 
 	service.run();
 
-	std::cout << "Server is down." << std::endl;
+	Utils::Info << "Server is down." << std::endl;
 }
 
 void Server::acceptHandler(const boost::system::error_code &error) {
 	if (error) {
-		std::cerr << "acceptHandler error: " << error << std::endl;
+		Utils::Error << "acceptHandler error: " << error << std::endl;
 		signalHandler(SIGINT);
 		return;
 	}
 
-	std::cout << "New Client from "
-			  << socket.remote_endpoint().address().to_string() << std::endl;
+	Utils::Info << "New Client from "
+				<< socket.remote_endpoint().address().to_string() << std::endl;
 
 	auto ptr = std::make_shared<Client>(std::move(socket));
 	roomless.insert(ptr);
 
 	ptr->on_error = boost::bind(&Server::onError, this, _1);
-	ptr->asyncReceive();
+	ptr->startReceive();
 
 	acceptor.async_accept(socket,
 						  boost::bind(&Server::acceptHandler, this, _1));
 }
 
 bool Server::onAuth(std::shared_ptr<Client> client) {
-	std::cout << "Auth: \'" << client->nickname << "\':\'" << client->password
-			  << '\'' << std::endl;
+	Utils::Success << "Auth: \'" << client->nickname << "\':\'"
+				   << client->password << '\'' << std::endl;
 	if (true) {
 		std::string list = "T";
 		for (auto &[name, room] : rooms)
 			list += name + ":";
 
-		client->asyncSend(Client::Event::Auth, list);
+		client->asyncSend(Client::Auth, list);
 		return true;
 	}
-	client->asyncSend(Client::Event::Auth, "F");
+	client->asyncSend(Client::Auth, "F");
 	return false;
 }
 
