@@ -4,7 +4,7 @@ using namespace boost::asio;
 
 Server Server::server;
 
-Server::Server() : acceptor(service){};
+Server::Server() : acceptor(service), socket(service){};
 
 void Server::signalHandler(int) {
 	server.acceptor.close();
@@ -29,21 +29,15 @@ void Server::startAtPort(int port) {
 
 	std::cout << "Server's up." << std::endl;
 
-	socket_ptr socket(new ip::tcp::socket(service));
-	startAccept(socket);
+	acceptor.async_accept(socket,
+						  boost::bind(&Server::acceptHandler, this, _1));
 
 	service.run();
 
 	std::cout << "Server is down." << std::endl;
 }
 
-void Server::startAccept(socket_ptr socket) {
-	acceptor.async_accept(
-		*socket, boost::bind(&Server::acceptHandler, this, socket, _1));
-}
-
-void Server::acceptHandler(socket_ptr socket,
-						   const boost::system::error_code &error) {
+void Server::acceptHandler(const boost::system::error_code &error) {
 	if (error) {
 		std::cerr << "acceptHandler error: " << error << std::endl;
 		signalHandler(SIGINT);
@@ -51,17 +45,16 @@ void Server::acceptHandler(socket_ptr socket,
 	}
 
 	std::cout << "New Client from "
-			  << socket->remote_endpoint().address().to_string() << std::endl;
+			  << socket.remote_endpoint().address().to_string() << std::endl;
 
-	auto ptr = std::make_shared<Client>(socket);
+	auto ptr = std::make_shared<Client>(std::move(socket));
 	roomless.insert(ptr);
 
 	ptr->on_error = boost::bind(&Server::onError, this, _1);
 	ptr->asyncReceive();
 
-	socket_ptr newSocket(new ip::tcp::socket(service));
-
-	startAccept(newSocket);
+	acceptor.async_accept(socket,
+						  boost::bind(&Server::acceptHandler, this, _1));
 }
 
 bool Server::onAuth(std::shared_ptr<Client> client) {
@@ -83,7 +76,7 @@ void Server::onError(std::shared_ptr<Client> client) {
 	roomless.erase(roomless.find(client));
 }
 
-void Server::onRoom(std::shared_ptr<Client> client) {
+void Server::onRoom(std::shared_ptr<Client> client, std::string room) {
 	onError(client);
-	rooms[client->getContent()].add(client);
+	rooms[room].add(client);
 }

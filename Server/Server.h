@@ -11,8 +11,6 @@
 #include <set>
 #include <unordered_map>
 
-using socket_ptr = std::shared_ptr<boost::asio::ip::tcp::socket>;
-
 class Server {
 	friend Client; // allow client class access callbacks
 
@@ -21,6 +19,7 @@ class Server {
 
 	boost::asio::io_service service;
 	boost::asio::ip::tcp::acceptor acceptor;
+	boost::asio::ip::tcp::socket socket;
 
 	std::unordered_map<std::string, Room> rooms;
 	std::set<std::shared_ptr<Client>> roomless;
@@ -30,11 +29,10 @@ class Server {
 	Server(const Server &) = delete;
 	void operator=(const Server &) = delete;
 
-	void acceptHandler(socket_ptr, const boost::system::error_code &);
-	void startAccept(socket_ptr);
+	void acceptHandler(const boost::system::error_code &);
 
 	bool onAuth(std::shared_ptr<Client>);
-	void onRoom(std::shared_ptr<Client>);
+	void onRoom(std::shared_ptr<Client>, std::string);
 	void onError(std::shared_ptr<Client>);
 
 	static void signalHandler(int);
