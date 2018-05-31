@@ -1,11 +1,13 @@
 #pragma once
 
+#include "Account.h"
+#include "DB.h"
 #include "Room.h"
 
 #include <boost/asio.hpp>
+#include <map>
 #include <memory>
-#include <set>
-#include <unordered_map>
+#include <unordered_set>
 
 class Server {
 	friend Client; // allow client class access callbacks
@@ -13,12 +15,14 @@ class Server {
   private:
 	static Server server;
 
+	DB database;
+
 	boost::asio::io_service service;
 	boost::asio::ip::tcp::acceptor acceptor;
 	boost::asio::ip::tcp::socket socket;
 
-	std::unordered_map<std::string, Room> rooms;
-	std::set<std::shared_ptr<Client>> roomless;
+	std::map<uint64_t, Room> rooms;
+	std::unordered_set<std::shared_ptr<Client>> roomless;
 
   private:
 	Server();
@@ -27,8 +31,8 @@ class Server {
 
 	void acceptHandler(const boost::system::error_code &);
 
-	bool onAuth(std::shared_ptr<Client>);
-	void onRoom(std::shared_ptr<Client>, std::string);
+	bool onAuth(std::shared_ptr<Client>, std::string, std::string);
+	bool onRoom(std::shared_ptr<Client>, uint64_t);
 	void onError(std::shared_ptr<Client>);
 
 	static void signalHandler(int);

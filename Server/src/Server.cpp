@@ -62,26 +62,48 @@ void Server::acceptHandler(const boost::system::error_code &error) {
 						  boost::bind(&Server::acceptHandler, this, _1));
 }
 
-bool Server::onAuth(std::shared_ptr<Client> client) {
-	Utils::Success << "Auth: \'" << client->nickname << "\':\'"
-				   << client->password << '\'' << std::endl;
-	if (true) {
-		std::string list = "T";
-		for (auto &[name, room] : rooms)
-			list += name + ":";
+bool Server::onAuth(std::shared_ptr<Client> client, std::string login,
+					std::string password) {
+	std::string mes;
+	client->account = database.getUserInfo(mes, login, password);
 
-		client->asyncSend(Client::Auth, list);
+	if (client->account) {
+		Utils::Success << "Auth: '" << login << "':'" << password << "'"
+					   << std::endl;
+
+		client->asyncSend(Client::Auth, std::string("T") + mes);
+
+		if (!client->account->rooms.empty())
+			roomless.erase(roomless.find(client));
+
+		for (uint64_t room_id : client->account->rooms) {
+			auto it = rooms.find(room_id);
+			if (it == rooms.end())
+				it = rooms.emplace(room_id, Room(room_id)).first;
+			it->second.add(client);
+		}
+
 		return true;
 	}
+	Utils::Error << "Auth: '" << login << "':'" << password << "'" << std::endl;
 	client->asyncSend(Client::Auth, "F");
 	return false;
 }
 
 void Server::onError(std::shared_ptr<Client> client) {
+	// purpose of this function is questionable.
 	roomless.erase(roomless.find(client));
 }
 
-void Server::onRoom(std::shared_ptr<Client> client, std::string room) {
-	onError(client);
-	rooms[room].add(client);
+bool Server::onRoom(std::shared_ptr<Client> client, uint64_t room_id) {
+	// onError(client);
+	if (database.mayConnect(client->account->id, room_id)) {
+		auto it = rooms.find(room_id);
+		if (it == rooms.end())
+			it = rooms.emplace(room_id, Room(room_id)).first;
+
+		it->second.add(client);
+		return true;
+	}
+	return false;
 }

@@ -6,10 +6,11 @@
 #include <cstdint>
 #include <iostream>
 
-std::function<bool(std::shared_ptr<Client>)> Client::on_auth =
-	boost::bind(&Server::onAuth, &Server::getInstance(), _1);
+std::function<bool(std::shared_ptr<Client>, std::string, std::string)>
+	Client::on_auth =
+		boost::bind(&Server::onAuth, &Server::getInstance(), _1, _2, _3);
 ;
-std::function<void(std::shared_ptr<Client>, std::string)> Client::on_room =
+std::function<bool(std::shared_ptr<Client>, uint64_t)> Client::on_room =
 	boost::bind(&Server::onRoom, &Server::getInstance(), _1, _2);
 
 Client::Client(boost::asio::ip::tcp::socket &&sock) : sock(std::move(sock)) {
@@ -30,8 +31,9 @@ void Client::asyncSend(Event type, std::string str) {
 				[this, self, buf = std::move(buf)](
 					const boost::system::error_code &err, size_t) {
 					if (err) {
-						Utils::Error << "write error in client \'" << nickname
-									 << "\': " << err << std::endl;
+						Utils::Error << "write error in client \'"
+									 << account.get() << "\': " << err
+									 << std::endl;
 						on_error(self);
 						return;
 					}
@@ -49,9 +51,9 @@ void Client::startReceive() {
 		[this, self, header = std::move(header)](
 			const boost::system::error_code &err, size_t) mutable {
 			if (err || (header[0] > (1 << 20))) {
-				Utils::Error << "header read error in client \'" << nickname
-							 << "\': " << err << "; size: " << header[0]
-							 << std::endl;
+				Utils::Error << "header read error in client \'"
+							 << account.get() << "\': " << err
+							 << "; size: " << header[0] << std::endl;
 				on_error(self);
 				return;
 			}
@@ -67,7 +69,8 @@ void Client::startReceive() {
 					const boost::system::error_code &err, size_t) {
 					if (err) {
 						Utils::Error << "content read error in client \'"
-									 << nickname << "\': " << err << std::endl;
+									 << account.get() << "\': " << err
+									 << std::endl;
 						on_error(self);
 						return;
 					}
@@ -87,25 +90,27 @@ void Client::Authentication(Event type, std::string str) {
 	if (ind == std::string::npos)
 		return;
 
-	nickname.resize(ind);
+	std::string login, password;
+	login.resize(ind);
 	password.resize(str.size() - ind - 1);
 
-	std::copy_n(str.begin(), nickname.size(), nickname.begin());
+	std::copy_n(str.begin(), login.size(), login.begin());
 	std::copy_n(str.begin() + ind + 1, password.size(), password.begin());
 
-	if (on_auth(shared_from_this()))
-		handler = [this](auto type, auto room) {
-			if (type != Room)
+	if (on_auth(shared_from_this(), login, password)) {
+		// handler = [this](auto type, auto room) {
+		//	if (type != Room)
+		//	return;
+
+		//	if (on_room(shared_from_this(), Utils::toU64(room)))
+		handler = [this](auto type, auto mes) {
+			if (type < ClientAPI)
 				return;
 
-			on_room(shared_from_this(), room);
-			handler = [this](auto type, auto mes) {
-				if (type < ClientAPI)
-					return;
-
-				on_read(shared_from_this(), type, mes);
-			};
+			on_read(shared_from_this(), type, mes);
 		};
+		//};
+	}
 }
 
 void Client::shutdown() {

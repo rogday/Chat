@@ -20,14 +20,15 @@ template <size_t Color> class Colored {
 	}
 };
 
-using Error = Colored<91>;
-using Info = Colored<37>;
-using Success = Colored<92>;
+using err = Colored<91>;
+using info = Colored<37>;
+using succ = Colored<92>;
 } // namespace
 
-static Error Error;
-static Info Info;
-static Success Success;
+static err Error;
+static info Info;
+static succ Success;
 
 std::string toStr(uint64_t);
+uint64_t toU64(std::string s);
 }; // namespace Utils
