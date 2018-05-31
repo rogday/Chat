@@ -33,6 +33,8 @@ class Server {
 
 	bool onAuth(std::shared_ptr<Client>, std::string, std::string);
 	bool onRoom(std::shared_ptr<Client>, uint64_t);
+	void onRead(std::shared_ptr<Client>, Client::Event, uint64_t,
+				std::string &);
 	void onError(std::shared_ptr<Client>);
 
 	static void signalHandler(int);

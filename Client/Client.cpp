@@ -54,7 +54,7 @@ void Client::send() {
 					std::cerr << "header write error: " << err << std::endl;
                     emit error();
 					return;
-				}
+                }
 
 				async_write(socket, boost::asio::buffer(writebuf),
 							boost::asio::transfer_exactly(writeheader[0]),

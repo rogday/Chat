@@ -44,7 +44,7 @@ void Server::startAtPort(int port) {
 
 void Server::acceptHandler(const boost::system::error_code &error) {
 	if (error) {
-		Utils::Error << "acceptHandler error: " << error << std::endl;
+		Utils::Error << "Accept error: " << error << std::endl;
 		signalHandler(SIGINT);
 		return;
 	}
@@ -54,8 +54,6 @@ void Server::acceptHandler(const boost::system::error_code &error) {
 
 	auto ptr = std::make_shared<Client>(std::move(socket));
 	roomless.insert(ptr);
-
-	ptr->on_error = boost::bind(&Server::onError, this, _1);
 	ptr->startReceive();
 
 	acceptor.async_accept(socket,
@@ -90,14 +88,24 @@ bool Server::onAuth(std::shared_ptr<Client> client, std::string login,
 	return false;
 }
 
+void Server::onRead(std::shared_ptr<Client> client, Client::Event type,
+					uint64_t room_id, std::string &mes) {
+	rooms.find(room_id)->second.onRead(client, type, mes);
+}
+
 void Server::onError(std::shared_ptr<Client> client) {
-	// purpose of this function is questionable.
-	roomless.erase(roomless.find(client));
+	if (!client->account || client->account->rooms.empty())
+		roomless.erase(roomless.find(client));
+	else
+		for (uint64_t room_id : client->account->rooms)
+			rooms.erase(rooms.find(room_id));
 }
 
 bool Server::onRoom(std::shared_ptr<Client> client, uint64_t room_id) {
-	// onError(client);
 	if (database.mayConnect(client->account->id, room_id)) {
+		if (client->account->rooms.empty())
+			roomless.erase(roomless.find(client));
+
 		auto it = rooms.find(room_id);
 		if (it == rooms.end())
 			it = rooms.emplace(room_id, Room(room_id)).first;

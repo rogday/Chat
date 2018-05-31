@@ -12,10 +12,11 @@ class Client : public std::enable_shared_from_this<Client> {
 	using Event = uint64_t;
 	enum { Auth, Room, NewCommer, ClientAPI };
 
-	std::function<void(std::shared_ptr<Client>, Event, std::string &)> on_read;
-	std::function<void(std::shared_ptr<Client>)> on_error;
-
   private:
+	static std::function<void(std::shared_ptr<Client>, Event, uint64_t,
+							  std::string &)>
+		on_read;
+	static std::function<void(std::shared_ptr<Client>)> on_error;
 	static std::function<bool(std::shared_ptr<Client>, std::string,
 							  std::string)>
 		on_auth;

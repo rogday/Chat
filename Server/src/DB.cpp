@@ -59,7 +59,8 @@ bool DB::mayConnect(uint64_t user_id, uint64_t room_id) {
 	std::string q = "select scope from map,rooms where user_id = '" +
 					std::to_string(user_id) + "' and room_id = '" +
 					std::to_string(room_id) + "' and room_id=id";
-	// add scope field to database
+	// add table of allowed users for private rooms
+
 	MYSQL_RES *result = querry(q);
 	if (!result)
 		return false;

@@ -5,22 +5,12 @@
 #include <iostream>
 
 Room::Room(uint64_t id) : id(id) {
-	Utils::Info << "New instance of Room." << std::endl;
+	Utils::Info << "Room#" << id << " is created." << std::endl;
 }
 
 void Room::add(std::shared_ptr<Client> newcommer) {
-	Utils::Success << "Room assignation: \'" << newcommer->account->login
-				   << "\' entered in" << id << std::endl;
-
-	// newcommer->on_read = boost::bind(&Room::onRead, this, _1, _2, _3);
-	// newcommer->on_error = boost::bind(&Room::erase, this, _1);
-
-	/*
-	on_read(static) should look for right room by received id and transfer
-	message to it. it = rooms.find(id); if(it) it->onRead(c, t, m);
-
-	on_error(also static) - should erase user from all rooms/roomless set.
-	 */
+	Utils::Success << "User '" << newcommer->account->login
+				   << "' entered in Room#" << id << std::endl;
 
 	std::string online = Utils::toStr(id); // add offline users too
 	for (auto it : clients)
@@ -50,10 +40,8 @@ void Room::erase(std::shared_ptr<Client> client) {
 }
 
 void Room::shutdown() {
-	for (auto it : clients) {
-		it->on_error = [](auto) {}; // ignore errors
+	for (auto it : clients)
 		it->shutdown();
-	}
 }
 
 bool Room::operator<(const Room &another) { return this->id < another.id; };

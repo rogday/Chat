@@ -6,6 +6,14 @@
 #include <cstdint>
 #include <iostream>
 
+std::function<void(std::shared_ptr<Client>, Client::Event, uint64_t,
+				   std::string &)>
+	Client::on_read =
+		boost::bind(&Server::onRead, &Server::getInstance(), _1, _2, _3, _4);
+
+std::function<void(std::shared_ptr<Client>)> Client::on_error =
+	boost::bind(&Server::onError, &Server::getInstance(), _1);
+
 std::function<bool(std::shared_ptr<Client>, std::string, std::string)>
 	Client::on_auth =
 		boost::bind(&Server::onAuth, &Server::getInstance(), _1, _2, _3);
@@ -31,7 +39,7 @@ void Client::asyncSend(Event type, std::string str) {
 				[this, self, buf = std::move(buf)](
 					const boost::system::error_code &err, size_t) {
 					if (err) {
-						Utils::Error << "write error in client \'"
+						Utils::Error << "Write error in client \'"
 									 << account.get() << "\': " << err
 									 << std::endl;
 						on_error(self);
@@ -51,7 +59,7 @@ void Client::startReceive() {
 		[this, self, header = std::move(header)](
 			const boost::system::error_code &err, size_t) mutable {
 			if (err || (header[0] > (1 << 20))) {
-				Utils::Error << "header read error in client \'"
+				Utils::Error << "Header read error in client \'"
 							 << account.get() << "\': " << err
 							 << "; size: " << header[0] << std::endl;
 				on_error(self);
@@ -68,7 +76,7 @@ void Client::startReceive() {
 				[this, self, header = std::move(header), buf = std::move(buf)](
 					const boost::system::error_code &err, size_t) {
 					if (err) {
-						Utils::Error << "content read error in client \'"
+						Utils::Error << "Content read error in client \'"
 									 << account.get() << "\': " << err
 									 << std::endl;
 						on_error(self);
@@ -86,31 +94,27 @@ void Client::Authentication(Event type, std::string str) {
 		return;
 
 	size_t ind = str.find(':');
-
 	if (ind == std::string::npos)
 		return;
 
-	std::string login, password;
-	login.resize(ind);
-	password.resize(str.size() - ind - 1);
+	std::string login = str.substr(0, ind), password = str.substr(ind + 1);
 
-	std::copy_n(str.begin(), login.size(), login.begin());
-	std::copy_n(str.begin() + ind + 1, password.size(), password.begin());
-
-	if (on_auth(shared_from_this(), login, password)) {
-		// handler = [this](auto type, auto room) {
-		//	if (type != Room)
-		//	return;
-
-		//	if (on_room(shared_from_this(), Utils::toU64(room)))
-		handler = [this](auto type, auto mes) {
-			if (type < ClientAPI)
+	if (on_auth(shared_from_this(), login, password))
+		handler = [this](auto type, auto mes) mutable {
+			// Enter in new room can be done here
+			if (type < ClientAPI || mes.size() < sizeof(uint64_t))
 				return;
 
-			on_read(shared_from_this(), type, mes);
+			uint64_t room_id = 0;
+			std::copy_n(mes.begin(), sizeof room_id, &room_id);
+			mes = mes.substr(sizeof room_id);
+
+			auto it = account->rooms.find(room_id);
+			if (it == account->rooms.end())
+				return;
+
+			on_read(shared_from_this(), type, room_id, mes);
 		};
-		//};
-	}
 }
 
 void Client::shutdown() {
