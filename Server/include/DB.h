@@ -20,7 +20,7 @@ class DB {
 	DB();
 	~DB();
 
-	std::unique_ptr<Account> getUserInfo(std::string &, std::string,
-										 std::string);
+	std::unique_ptr<Account> getUserInfo(std::unique_ptr<API::AuthAnswer> &,
+										 std::string, std::string);
 	bool mayConnect(uint64_t, uint64_t);
 };

@@ -2,13 +2,19 @@
 
 #include <sstream>
 
-std::string Utils::toStr(uint64_t n) {
+std::string Utils::rStr(API::ID n) {
 	return std::string(reinterpret_cast<char *>(&n), sizeof n);
 }
 
-uint64_t Utils::toU64(std::string s) {
+API::ID Utils::rID(std::string::iterator it) {
+	API::ID id;
+	std::copy_n(it, sizeof(API::ID), &id);
+	return id;
+}
+
+API::ID Utils::toID(std::string s) {
 	std::stringstream ss(s);
-	uint64_t n;
+	API::ID n;
 	ss >> n;
 	return n;
 }

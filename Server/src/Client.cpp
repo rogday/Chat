@@ -1,13 +1,12 @@
 #include "Client.h"
+#include "Messages.h"
 #include "Server.h"
-#include "Utils.h"
 
 #include <boost/bind.hpp>
 #include <cstdint>
 #include <iostream>
 
-std::function<void(std::shared_ptr<Client>, Client::Event, uint64_t,
-				   std::string &)>
+std::function<void(std::shared_ptr<Client>, API::Event, API::ID, std::string)>
 	Client::on_read =
 		boost::bind(&Server::onRead, &Server::getInstance(), _1, _2, _3, _4);
 
@@ -18,7 +17,7 @@ std::function<bool(std::shared_ptr<Client>, std::string, std::string)>
 	Client::on_auth =
 		boost::bind(&Server::onAuth, &Server::getInstance(), _1, _2, _3);
 ;
-std::function<bool(std::shared_ptr<Client>, uint64_t)> Client::on_room =
+std::function<bool(std::shared_ptr<Client>, API::ID)> Client::on_room =
 	boost::bind(&Server::onRoom, &Server::getInstance(), _1, _2);
 
 Client::Client(boost::asio::ip::tcp::socket &&sock) : sock(std::move(sock)) {
@@ -27,10 +26,10 @@ Client::Client(boost::asio::ip::tcp::socket &&sock) : sock(std::move(sock)) {
 
 Client::~Client() { Utils::Info << "Client went out of scope." << std::endl; }
 
-void Client::asyncSend(Event type, std::string str) {
-	uint64_t n = str.size();
-	auto buf = std::make_unique<std::string>(Utils::toStr(n) +
-											 Utils::toStr(type) + str);
+void Client::asyncSend(API::Event type, std::string str) {
+	API::ID n = str.size();
+	auto buf =
+		std::make_unique<std::string>(Utils::rStr(n) + Utils::rStr(type) + str);
 	auto self = shared_from_this();
 	auto ptr = buf.get();
 
@@ -49,7 +48,7 @@ void Client::asyncSend(Event type, std::string str) {
 }
 
 void Client::startReceive() {
-	auto header = std::make_unique<uint64_t[]>(2);
+	auto header = std::make_unique<API::ID[]>(2);
 	auto self = shared_from_this();
 	auto ptr = header.get();
 
@@ -83,37 +82,34 @@ void Client::startReceive() {
 						return;
 					}
 
-					handler((Event)header[1], *buf);
+					handler((API::Event)header[1], std::move(*buf));
 					startReceive();
 				});
 		});
 }
 
-void Client::Authentication(Event type, std::string str) {
-	if (type != Auth)
+void Client::Authentication(API::Event type, std::string str) {
+	if (type != API::Auth)
 		return;
 
-	size_t ind = str.find(':');
-	if (ind == std::string::npos)
+	API::AuthRequest request(std::move(str));
+	if (!request.isOk())
 		return;
 
-	std::string login = str.substr(0, ind), password = str.substr(ind + 1);
-
-	if (on_auth(shared_from_this(), login, password))
+	if (on_auth(shared_from_this(), request.getLogin(), request.getPassword()))
 		handler = [this](auto type, auto mes) mutable {
 			// Enter in new room can be done here
-			if (type < ClientAPI || mes.size() < sizeof(uint64_t))
+			if (type < API::ClientAPI || mes.size() < sizeof(API::ID))
 				return;
 
-			uint64_t room_id = 0;
-			std::copy_n(mes.begin(), sizeof room_id, &room_id);
-			mes = mes.substr(sizeof room_id);
+			API::Message msg(std::move(mes));
+			API::ID room_id = msg.getID();
 
 			auto it = account->rooms.find(room_id);
 			if (it == account->rooms.end())
 				return;
 
-			on_read(shared_from_this(), type, room_id, mes);
+			on_read(shared_from_this(), type, room_id, msg.getData());
 		};
 }
 

@@ -1,5 +1,7 @@
 #pragma once
 
+#include "Messages.h"
+
 #include <cstdint>
 #include <iostream>
 #include <string>
@@ -29,6 +31,8 @@ static err Error;
 static info Info;
 static succ Success;
 
-std::string toStr(uint64_t);
-uint64_t toU64(std::string s);
+std::string rStr(API::ID);
+API::ID rID(std::string::iterator);
+
+API::ID toID(std::string s);
 }; // namespace Utils

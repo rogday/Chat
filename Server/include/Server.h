@@ -2,6 +2,7 @@
 
 #include "Account.h"
 #include "DB.h"
+#include "Messages.h"
 #include "Room.h"
 
 #include <boost/asio.hpp>
@@ -21,7 +22,7 @@ class Server {
 	boost::asio::ip::tcp::acceptor acceptor;
 	boost::asio::ip::tcp::socket socket;
 
-	std::map<uint64_t, Room> rooms;
+	std::map<API::ID, Room> rooms;
 	std::unordered_set<std::shared_ptr<Client>> roomless;
 
   private:
@@ -32,9 +33,8 @@ class Server {
 	void acceptHandler(const boost::system::error_code &);
 
 	bool onAuth(std::shared_ptr<Client>, std::string, std::string);
-	bool onRoom(std::shared_ptr<Client>, uint64_t);
-	void onRead(std::shared_ptr<Client>, Client::Event, uint64_t,
-				std::string &);
+	bool onRoom(std::shared_ptr<Client>, API::ID);
+	void onRead(std::shared_ptr<Client>, API::Event, API::ID, std::string);
 	void onError(std::shared_ptr<Client>);
 
 	static void signalHandler(int);

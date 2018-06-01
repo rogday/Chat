@@ -1,6 +1,7 @@
 #pragma once
 
 #include "Account.h"
+#include "Messages.h"
 
 #include <boost/asio.hpp>
 #include <functional>
@@ -9,35 +10,29 @@
 
 class Client : public std::enable_shared_from_this<Client> {
   public:
-	using Event = uint64_t;
-	enum { Auth, Room, NewCommer, ClientAPI };
+	std::unique_ptr<Account> account;
 
   private:
-	static std::function<void(std::shared_ptr<Client>, Event, uint64_t,
-							  std::string &)>
+	static std::function<void(std::shared_ptr<Client>, API::Event, API::ID,
+							  std::string)>
 		on_read;
 	static std::function<void(std::shared_ptr<Client>)> on_error;
 	static std::function<bool(std::shared_ptr<Client>, std::string,
 							  std::string)>
 		on_auth;
-	static std::function<bool(std::shared_ptr<Client>, uint64_t)> on_room;
+	static std::function<bool(std::shared_ptr<Client>, API::ID)> on_room;
 
-	std::function<void(Event, std::string)> handler;
-
+	std::function<void(API::Event, std::string)> handler;
 	boost::asio::ip::tcp::socket sock;
 
   private:
-	void send();
-	void Authentication(Event, std::string);
-
-  public:
-	std::unique_ptr<Account> account;
+	void Authentication(API::Event, std::string);
 
   public:
 	Client(boost::asio::ip::tcp::socket &&);
 	~Client();
 
-	void asyncSend(Event, std::string);
+	void asyncSend(API::Event, std::string);
 	void startReceive();
 
 	void shutdown();

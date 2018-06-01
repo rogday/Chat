@@ -62,19 +62,19 @@ void Server::acceptHandler(const boost::system::error_code &error) {
 
 bool Server::onAuth(std::shared_ptr<Client> client, std::string login,
 					std::string password) {
-	std::string mes;
-	client->account = database.getUserInfo(mes, login, password);
+	std::unique_ptr<API::AuthAnswer> auth;
+	client->account = database.getUserInfo(auth, login, password);
 
 	if (client->account) {
 		Utils::Success << "Auth: '" << login << "':'" << password << "'"
 					   << std::endl;
 
-		client->asyncSend(Client::Auth, std::string("T") + mes);
+		client->asyncSend(API::Auth, std::string("T") + auth->getBuf());
 
 		if (!client->account->rooms.empty())
 			roomless.erase(roomless.find(client));
 
-		for (uint64_t room_id : client->account->rooms) {
+		for (API::ID room_id : client->account->rooms) {
 			auto it = rooms.find(room_id);
 			if (it == rooms.end())
 				it = rooms.emplace(room_id, Room(room_id)).first;
@@ -84,12 +84,12 @@ bool Server::onAuth(std::shared_ptr<Client> client, std::string login,
 		return true;
 	}
 	Utils::Error << "Auth: '" << login << "':'" << password << "'" << std::endl;
-	client->asyncSend(Client::Auth, "F");
+	client->asyncSend(API::Auth, "F");
 	return false;
 }
 
-void Server::onRead(std::shared_ptr<Client> client, Client::Event type,
-					uint64_t room_id, std::string &mes) {
+void Server::onRead(std::shared_ptr<Client> client, API::Event type,
+					API::ID room_id, std::string mes) {
 	rooms.find(room_id)->second.onRead(client, type, mes);
 }
 
@@ -97,11 +97,11 @@ void Server::onError(std::shared_ptr<Client> client) {
 	if (!client->account || client->account->rooms.empty())
 		roomless.erase(roomless.find(client));
 	else
-		for (uint64_t room_id : client->account->rooms)
+		for (API::ID room_id : client->account->rooms)
 			rooms.erase(rooms.find(room_id));
 }
 
-bool Server::onRoom(std::shared_ptr<Client> client, uint64_t room_id) {
+bool Server::onRoom(std::shared_ptr<Client> client, API::ID room_id) {
 	if (database.mayConnect(client->account->id, room_id)) {
 		if (client->account->rooms.empty())
 			roomless.erase(roomless.find(client));

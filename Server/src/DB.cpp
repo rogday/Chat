@@ -16,7 +16,8 @@ DB::DB() : connection(mysql_init(nullptr)) {
 
 DB::~DB() { mysql_close(connection); }
 
-std::unique_ptr<Account> DB::getUserInfo(std::string &s, std::string login,
+std::unique_ptr<Account> DB::getUserInfo(std::unique_ptr<API::AuthAnswer> &auth,
+										 std::string login,
 										 std::string password) {
 	std::string q = "select id from users where login = '" + login +
 					"' and password = '" + password + "'";
@@ -30,7 +31,7 @@ std::unique_ptr<Account> DB::getUserInfo(std::string &s, std::string login,
 	if (!row)
 		return nullptr;
 
-	uint64_t id = Utils::toU64(row[0]);
+	uint64_t id = Utils::toID(row[0]);
 	mysql_free_result(result);
 
 	q = "select id,name from map,rooms where user_id='" + std::to_string(id) +
@@ -45,10 +46,10 @@ std::unique_ptr<Account> DB::getUserInfo(std::string &s, std::string login,
 	account->password = password;
 	account->id = id;
 
-	s = Utils::toStr(id);
+	auth = std::make_unique<API::AuthAnswer>(id);
 	while ((row = mysql_fetch_row(result))) {
-		account->rooms.insert(Utils::toU64(row[0]));
-		s += Utils::toStr(Utils::toU64(row[0])) + row[1] + ":";
+		account->rooms.insert(Utils::toID(row[0]));
+		auth->insert(Utils::toID(row[0]), row[1]);
 	}
 
 	mysql_free_result(result);
