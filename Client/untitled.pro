@@ -21,21 +21,26 @@ DEFINES += QT_DEPRECATED_WARNINGS
 # In order to do so, uncomment the following line.
 # You can also select to disable deprecated APIs only up to a certain version of Qt.
 #DEFINES += QT_DISABLE_DEPRECATED_BEFORE=0x060000    # disables all the APIs deprecated before Qt 6.0.0
+INCLUDEPATH += D:/alex/boost_1_66_0 \
+            ../API/include
 
-CONFIG += c++1z
+CONFIG += c++14
 
-LIBS += \
-       -lboost_system\
-       -lpthread
+LIBS += -LD:\alex\boost_1_66_0\lib64-msvc-14.1 \
+        -lboost_system-vc141-mt-x64-1_66
 
 SOURCES += \
         main.cpp \
         mainwindow.cpp \
-    Client.cpp
+        Client.cpp \
+    ../API/src/Messages.cpp \
+    ../API/src/Utils.cpp
 
 HEADERS += \
         mainwindow.h \
-    Client.h
+        Client.h \
+    ../API/include/Messages.h \
+    ../API/include/Utils.h
 
 FORMS += \
         mainwindow.ui

@@ -1,4 +1,5 @@
 #include "Client.h"
+#include <cstdint>
 
 using namespace boost::asio;
 
@@ -29,65 +30,48 @@ void Client::signalHandler(int n) {
 	signal(n, signalHandler);
 }
 
-void Client::asyncSend(Event type, std::string str) {
-	bool empty = msgQueue.empty();
+void Client::asyncSend(API::Event type, std::string str) {
+    API::ID n = str.size();
+    auto buf = std::make_unique<std::string>(std::string(reinterpret_cast<char *>(&n), sizeof n) +
+                                        std::string(reinterpret_cast<char *>(&type), sizeof type) + str);
+    auto ptr = buf.get();
 
-	msgQueue.emplace_back(type, str);
-	if (empty)
-		send();
-}
-
-void Client::send() {
-	if (!msgQueue.empty()) {
-		auto tmp = msgQueue.front();
-
-		writeheader[0] = std::get<1>(tmp).size();
-		writeheader[1] = std::get<0>(tmp);
-		writebuf = std::get<1>(tmp);
-
-		async_write(
-			socket,
-			boost::asio::buffer((char *)writeheader, sizeof writeheader),
-			boost::asio::transfer_exactly(sizeof writeheader),
-            [this](const boost::system::error_code &err, size_t) {
-				if (err) {
-					std::cerr << "header write error: " << err << std::endl;
-                    emit error();
-					return;
-                }
-
-				async_write(socket, boost::asio::buffer(writebuf),
-							boost::asio::transfer_exactly(writeheader[0]),
-                            [this](const boost::system::error_code &err, size_t) {
-								if (err) {
-									std::cerr << "content write error: " << err
-											  << std::endl;
-                                    emit error();
-									return;
-								}
-
-								msgQueue.pop_front();
-								send();
-							});
-			});
-	}
+    async_write(
+        socket,
+        boost::asio::buffer(ptr->data(), ptr->size()),
+        boost::asio::transfer_exactly(ptr->size()),
+        [this, buf = std::move(buf)](const boost::system::error_code &err, size_t) {
+            if (err) {
+                std::cerr << "header write error: " << err << std::endl;
+                emit error();
+                return;
+            }
+        });
 }
 
 void Client::startRecieving() {
+    auto header =std::make_unique<API::ID[]>(2);
+    auto ptr = header.get();
+
 	async_read(socket,
-			   boost::asio::buffer((char *)readheader, sizeof readheader),
-			   boost::asio::transfer_exactly(sizeof readheader),
-               [this](const boost::system::error_code &err, size_t) {
-				   if (err) {
+               boost::asio::buffer((char *)ptr, 16),
+               boost::asio::transfer_exactly(16),
+               [this, header = std::move(header)](const boost::system::error_code &err, size_t) mutable {
+                   if (err || (header[0] > (1 << 20))) {
 					   std::cerr << "header read error: " << err << std::endl;
                        emit error();
 					   return;
 				   }
 
-				   readbuf.resize(readheader[0]);
-				   async_read(socket, boost::asio::buffer(readbuf),
-							  boost::asio::transfer_exactly(readheader[0]),
-                              [this](const boost::system::error_code &err, size_t) {
+                   auto buf = std::make_unique<std::string>();
+                   auto ptr = buf.get();
+                   buf->resize(header[0]);
+
+                   async_read(socket,
+                   boost::asio::buffer((void*)ptr->data(), ptr->size()),
+                   boost::asio::transfer_exactly(ptr->size()),
+                         [this, header = std::move(header), buf = std::move(buf)]
+                              (const boost::system::error_code &err, size_t) {
 								  if (err) {
 									  std::cerr << "content read error: " << err
 												<< std::endl;
@@ -95,33 +79,32 @@ void Client::startRecieving() {
 									  return;
 								  }
 
-								  if (readheader[1] >= ClientAPI) {
-                                      emit read(readbuf);
+                                  if ((API::Event)header[1] >= API::ClientAPI) {
+                                      emit read(*buf);
 									  // there you can be sure that it's message
 									  // from another client and add your own
 									  // API for files, music, voice, etc
 								  } else
-									  switch (readheader[1]) {
-									  case Auth:
-                                          if (readbuf.empty())
+                                      switch ((API::Event)header[1]) {
+                                      case API::Auth:
+                                          if ((*buf).size()==0)
                                               emit login();
-										  else {
-                                              emit auth(readbuf);
-										  }
+                                          else
+                                                emit auth(buf->substr(0));//T
 										  break;
-									  case Room:
-                                          emit room(readbuf);
+                                      case API::Room:
+                                          emit auth2(*buf);
 										  break;
-									  case NewCommer:
-                                          emit newcommer(readbuf);
+                                      case API::NewCommer:
+                                          emit newcommer(*buf);
 										  break;
 									  default:
 										  std::cerr << "Unimplemented feature: "
-													<< readheader[1] << ' '
-													<< readbuf << std::endl;
-									  }
+                                                    << header[1] << ' '
+                                                    << *buf << std::endl;
+                                      }
 
 								  startRecieving();
 							  });
-			   });
+               });
 }

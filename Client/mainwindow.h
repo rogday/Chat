@@ -24,11 +24,18 @@ class MainWindow : public QMainWindow {
 	void on_send_clicked();
 	void on_entry_blockCountChanged(int newBlockCount);
 
-  public slots:
+    void on_back_to_server_clicked();
+
+    void on_change_user_clicked();
+
+    void on_change_room_clicked();
+
+public slots:
     void showConnect();
     void showLogin();
     void showRooms(std::string);
-    void showChat(std::string);
+    void showChat();
+    void addpeople(std::string);
 
     void newMes(std::string);
     void newUserlist(std::string);
