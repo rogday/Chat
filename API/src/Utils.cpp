@@ -8,7 +8,7 @@ std::string Utils::rStr(API::ID n) {
 
 API::ID Utils::rID(std::string::iterator it) {
 	API::ID id;
-	std::copy_n(it, sizeof(API::ID), &id);
+	std::copy_n(it, sizeof(API::ID), (char *)&id);
 	return id;
 }
 

@@ -7,8 +7,8 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -D_GLIBCXX_DEBUG -Wall -Wextra -O2 -s
 find_package(Boost 1.66 COMPONENTS system)
 find_package (Threads)
 
-include_directories(include)
-file(GLOB SOURCES "src/*.cpp")
+include_directories("Server/include" "API/include")
+file(GLOB SOURCES "Server/src/*.cpp" "API/src/*.cpp")
 
 execute_process(COMMAND mysql_config --cflags
     OUTPUT_VARIABLE MYSQL_CFLAGS OUTPUT_STRIP_TRAILING_WHITESPACE)

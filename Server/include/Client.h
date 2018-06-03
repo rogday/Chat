@@ -32,7 +32,7 @@ class Client : public std::enable_shared_from_this<Client> {
 	Client(boost::asio::ip::tcp::socket &&);
 	~Client();
 
-	void asyncSend(API::Event, std::string);
+	void asyncSend(API::Event, std::string = "");
 	void startReceive();
 
 	void shutdown();

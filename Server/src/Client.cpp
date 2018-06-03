@@ -53,8 +53,8 @@ void Client::startReceive() {
 	auto ptr = header.get();
 
 	async_read(
-		sock, boost::asio::buffer((char *)ptr, 16),
-		boost::asio::transfer_exactly(16),
+		sock, boost::asio::buffer((char *)ptr, 2 * sizeof(API::ID)),
+		boost::asio::transfer_exactly(2 * sizeof(API::ID)),
 		[this, self, header = std::move(header)](
 			const boost::system::error_code &err, size_t) mutable {
 			if (err || (header[0] > (1 << 20))) {

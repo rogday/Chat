@@ -31,7 +31,7 @@ std::unique_ptr<Account> DB::getUserInfo(std::unique_ptr<API::AuthAnswer> &auth,
 	if (!row)
 		return nullptr;
 
-	uint64_t id = Utils::toID(row[0]);
+	API::ID id = Utils::toID(row[0]);
 	mysql_free_result(result);
 
 	q = "select id,name from map,rooms where user_id='" + std::to_string(id) +
@@ -56,7 +56,7 @@ std::unique_ptr<Account> DB::getUserInfo(std::unique_ptr<API::AuthAnswer> &auth,
 	return account;
 }
 
-bool DB::mayConnect(uint64_t user_id, uint64_t room_id) {
+bool DB::mayConnect(API::ID user_id, API::ID room_id) {
 	std::string q = "select scope from map,rooms where user_id = '" +
 					std::to_string(user_id) + "' and room_id = '" +
 					std::to_string(room_id) + "' and room_id=id";

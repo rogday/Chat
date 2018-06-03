@@ -69,7 +69,7 @@ bool Server::onAuth(std::shared_ptr<Client> client, std::string login,
 		Utils::Success << "Auth: '" << login << "':'" << password << "'"
 					   << std::endl;
 
-		client->asyncSend(API::Auth, std::string("T") + auth->getBuf());
+		client->asyncSend(API::Auth, auth->getBuf());
 
 		if (!client->account->rooms.empty())
 			roomless.erase(roomless.find(client));
@@ -84,7 +84,7 @@ bool Server::onAuth(std::shared_ptr<Client> client, std::string login,
 		return true;
 	}
 	Utils::Error << "Auth: '" << login << "':'" << password << "'" << std::endl;
-	client->asyncSend(API::Auth, "F");
+	client->asyncSend(API::Auth);
 	return false;
 }
 
@@ -98,7 +98,7 @@ void Server::onError(std::shared_ptr<Client> client) {
 		roomless.erase(roomless.find(client));
 	else
 		for (API::ID room_id : client->account->rooms)
-			rooms.erase(rooms.find(room_id));
+			rooms.find(room_id)->second.erase(client);
 }
 
 bool Server::onRoom(std::shared_ptr<Client> client, API::ID room_id) {

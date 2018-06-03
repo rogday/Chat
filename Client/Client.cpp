@@ -103,10 +103,10 @@ void Client::startRecieving() {
 								  } else
 									  switch (readheader[1]) {
 									  case Auth:
-										  if (readbuf[0] == 'F')
+                                          if (readbuf.empty())
                                               emit login();
 										  else {
-                                              emit auth(readbuf.substr(1));
+                                              emit auth(readbuf);
 										  }
 										  break;
 									  case Room:
