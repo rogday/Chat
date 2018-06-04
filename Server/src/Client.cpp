@@ -13,7 +13,7 @@ std::function<void(std::shared_ptr<Client>, API::Event, API::ID, std::string)>
 std::function<void(std::shared_ptr<Client>)> Client::on_error =
 	boost::bind(&Server::onError, &Server::getInstance(), _1);
 
-std::function<bool(std::shared_ptr<Client>, std::string, std::string)>
+std::function<void(std::shared_ptr<Client>, std::string, std::string)>
 	Client::on_auth =
 		boost::bind(&Server::onAuth, &Server::getInstance(), _1, _2, _3);
 ;
@@ -38,9 +38,8 @@ void Client::asyncSend(API::Event type, std::string str) {
 				[this, self, buf = std::move(buf)](
 					const boost::system::error_code &err, size_t) {
 					if (err) {
-						Utils::Error << "Write error in client \'"
-									 << account.get() << "\': " << err
-									 << std::endl;
+						Utils::Error << "Write error in client \'" << this
+									 << "\': " << err << std::endl;
 						on_error(self);
 						return;
 					}
@@ -58,9 +57,9 @@ void Client::startReceive() {
 		[this, self, header = std::move(header)](
 			const boost::system::error_code &err, size_t) mutable {
 			if (err || (header[0] > (1 << 20))) {
-				Utils::Error << "Header read error in client \'"
-							 << account.get() << "\': " << err
-							 << "; size: " << header[0] << std::endl;
+				Utils::Error << "Header read error in client \'" << this
+							 << "\': " << err << "; size: " << header[0]
+							 << std::endl;
 				on_error(self);
 				return;
 			}
@@ -76,8 +75,7 @@ void Client::startReceive() {
 					const boost::system::error_code &err, size_t) {
 					if (err) {
 						Utils::Error << "Content read error in client \'"
-									 << account.get() << "\': " << err
-									 << std::endl;
+									 << this << "\': " << err << std::endl;
 						on_error(self);
 						return;
 					}
@@ -96,22 +94,30 @@ void Client::Authentication(API::Event type, std::string str) {
 	if (!request.isOk())
 		return;
 
-	if (on_auth(shared_from_this(), request.getLogin(), request.getPassword()))
-		handler = [this](auto type, auto mes) mutable {
-			// Enter in new room can be done here
-			if (type < API::ClientAPI || mes.size() < sizeof(API::ID))
-				return;
-
-			API::Message msg(std::move(mes));
-			API::ID room_id = msg.getID();
-
-			auto it = account->rooms.find(room_id);
-			if (it == account->rooms.end())
-				return;
-
-			on_read(shared_from_this(), type, room_id, msg.getData());
-		};
+	on_auth(shared_from_this(), request.getLogin(), request.getPassword());
 }
+
+void Client::Messaging(API::Event type, std::string mes) {
+	// Enter in new room can be done here
+	if (type < API::ClientAPI || mes.size() < sizeof(API::ID))
+		return;
+
+	API::Message msg(std::move(mes));
+	API::ID room_id = msg.getID();
+
+	auto it = account.rooms.find(room_id);
+	if (it == account.rooms.end())
+		return;
+
+	on_read(shared_from_this(), type, room_id, msg.getData());
+}
+
+void Client::setAuth(Account &acc) {
+	account = acc;
+	handler = boost::bind(&Client::Messaging, this, _1, _2);
+}
+
+Account &Client::getAcc() { return account; }
 
 void Client::shutdown() {
 	if (sock.is_open()) {

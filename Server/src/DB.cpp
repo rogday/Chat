@@ -1,5 +1,7 @@
 #include "DB.h"
 
+#include <exception>
+
 MYSQL_RES *DB::querry(std::string str) {
 	if (mysql_query(connection, str.data()))
 		return nullptr;
@@ -7,7 +9,8 @@ MYSQL_RES *DB::querry(std::string str) {
 	return mysql_store_result(connection);
 }
 
-DB::DB() : connection(mysql_init(nullptr)) {
+DB::DB(boost::asio::io_service &service)
+	: connection(mysql_init(nullptr)), service(service) {
 	if (!connection ||
 		!mysql_real_connect(connection, "localhost", "root", "duck",
 							"messenger", 3306, nullptr, 0))
@@ -16,20 +19,24 @@ DB::DB() : connection(mysql_init(nullptr)) {
 
 DB::~DB() { mysql_close(connection); }
 
-std::unique_ptr<Account> DB::getUserInfo(std::unique_ptr<API::AuthAnswer> &auth,
-										 std::string login,
-										 std::string password) {
+void DB::getUserInfo(std::string login, std::string password,
+					 std::function<void(API::AuthAnswer, Account)> success,
+					 std::function<void()> error) {
 	std::string q = "select id from users where login = '" + login +
 					"' and password = '" + password + "'";
 
 	MYSQL_RES *result = querry(q);
-	if (!result)
-		return nullptr;
+	if (!result) {
+		service.post(error);
+		return;
+	}
 
 	MYSQL_ROW row = mysql_fetch_row(result);
 
-	if (!row)
-		return nullptr;
+	if (!row) {
+		service.post(error);
+		return;
+	}
 
 	API::ID id = Utils::toID(row[0]);
 	mysql_free_result(result);
@@ -38,22 +45,24 @@ std::unique_ptr<Account> DB::getUserInfo(std::unique_ptr<API::AuthAnswer> &auth,
 		"' and room_id = id";
 
 	result = querry(q);
-	if (!result)
-		return nullptr;
+	if (!result) {
+		service.post(error);
+		return;
+	}
 
-	auto account = std::make_unique<Account>();
-	account->login = login;
-	account->password = password;
-	account->id = id;
+	Account account;
+	account.login = login;
+	account.password = password;
+	account.id = id;
 
-	auth = std::make_unique<API::AuthAnswer>(id);
+	API::AuthAnswer auth(id);
 	while ((row = mysql_fetch_row(result))) {
-		account->rooms.insert(Utils::toID(row[0]));
-		auth->insert(Utils::toID(row[0]), row[1]);
+		account.rooms.insert(Utils::toID(row[0]));
+		auth.insert(Utils::toID(row[0]), row[1]);
 	}
 
 	mysql_free_result(result);
-	return account;
+	service.post(std::bind(success, auth, account));
 }
 
 bool DB::mayConnect(API::ID user_id, API::ID room_id) {

@@ -16,11 +16,10 @@ class Server {
   private:
 	static Server server;
 
-	DB database;
-
 	boost::asio::io_service service;
 	boost::asio::ip::tcp::acceptor acceptor;
 	boost::asio::ip::tcp::socket socket;
+	DB database;
 
 	std::map<API::ID, Room> rooms;
 	std::unordered_set<std::shared_ptr<Client>> roomless;
@@ -32,7 +31,7 @@ class Server {
 
 	void acceptHandler(const boost::system::error_code &);
 
-	bool onAuth(std::shared_ptr<Client>, std::string, std::string);
+	void onAuth(std::shared_ptr<Client>, std::string, std::string);
 	bool onRoom(std::shared_ptr<Client>, API::ID);
 	void onRead(std::shared_ptr<Client>, API::Event, API::ID, std::string);
 	void onError(std::shared_ptr<Client>);

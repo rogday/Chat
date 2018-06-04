@@ -3,24 +3,25 @@
 #include "Account.h"
 #include "Utils.h"
 
-#include <exception>
+#include <boost/asio.hpp>
+#include <functional>
 #include <mariadb/mysql.h>
-#include <memory>
-#include <optional>
 #include <string>
 
 class DB {
   private:
 	MYSQL *connection;
+	boost::asio::io_service &service;
 
   private:
 	MYSQL_RES *querry(std::string str);
 
   public:
-	DB();
+	DB(boost::asio::io_service &);
 	~DB();
 
-	std::unique_ptr<Account> getUserInfo(std::unique_ptr<API::AuthAnswer> &,
-										 std::string, std::string);
+	void getUserInfo(std::string, std::string,
+					 std::function<void(API::AuthAnswer, Account)>,
+					 std::function<void()>);
 	bool mayConnect(API::ID, API::ID);
 };

@@ -4,12 +4,13 @@
 #include <boost/bind.hpp>
 #include <csignal>
 #include <iostream>
+#include <thread>
 
 using namespace boost::asio;
 
 Server Server::server;
 
-Server::Server() : acceptor(service), socket(service){};
+Server::Server() : acceptor(service), socket(service), database(service){};
 
 void Server::signalHandler(int) {
 	server.acceptor.close();
@@ -60,32 +61,33 @@ void Server::acceptHandler(const boost::system::error_code &error) {
 						  boost::bind(&Server::acceptHandler, this, _1));
 }
 
-bool Server::onAuth(std::shared_ptr<Client> client, std::string login,
+void Server::onAuth(std::shared_ptr<Client> client, std::string login,
 					std::string password) {
-	std::unique_ptr<API::AuthAnswer> auth;
-	client->account = database.getUserInfo(auth, login, password);
+	std::thread t(&DB::getUserInfo, &database, login, password,
+				  [this, client](API::AuthAnswer answ, Account acc) {
+					  client->setAuth(acc);
 
-	if (client->account) {
-		Utils::Success << "Auth: '" << login << "':'" << password << "'"
-					   << std::endl;
+					  Utils::Success << "Auth: '" << acc.login << "':'"
+									 << acc.password << "'" << std::endl;
 
-		client->asyncSend(API::Auth, auth->getBuf());
+					  client->asyncSend(API::Auth, answ.getBuf());
 
-		if (!client->account->rooms.empty())
-			roomless.erase(roomless.find(client));
+					  if (!acc.rooms.empty())
+						  roomless.erase(roomless.find(client));
 
-		for (API::ID room_id : client->account->rooms) {
-			auto it = rooms.find(room_id);
-			if (it == rooms.end())
-				it = rooms.emplace(room_id, Room(room_id)).first;
-			it->second.add(client);
-		}
-
-		return true;
-	}
-	Utils::Error << "Auth: '" << login << "':'" << password << "'" << std::endl;
-	client->asyncSend(API::Auth);
-	return false;
+					  for (API::ID room_id : acc.rooms) {
+						  auto it = rooms.find(room_id);
+						  if (it == rooms.end())
+							  it = rooms.emplace(room_id, Room(room_id)).first;
+						  it->second.add(client);
+					  }
+				  },
+				  [client]() {
+					  Utils::Error << "Client " << client.get()
+								   << " failed to log in." << std::endl;
+					  client->asyncSend(API::Auth);
+				  });
+	t.detach();
 }
 
 void Server::onRead(std::shared_ptr<Client> client, API::Event type,
@@ -94,16 +96,18 @@ void Server::onRead(std::shared_ptr<Client> client, API::Event type,
 }
 
 void Server::onError(std::shared_ptr<Client> client) {
-	if (!client->account || client->account->rooms.empty())
+	auto &acc = client->getAcc();
+	if (acc.login.empty() || acc.rooms.empty())
 		roomless.erase(roomless.find(client));
 	else
-		for (API::ID room_id : client->account->rooms)
+		for (API::ID room_id : acc.rooms)
 			rooms.find(room_id)->second.erase(client);
 }
 
 bool Server::onRoom(std::shared_ptr<Client> client, API::ID room_id) {
-	if (database.mayConnect(client->account->id, room_id)) {
-		if (client->account->rooms.empty())
+	auto &acc = client->getAcc();
+	if (database.mayConnect(acc.id, room_id)) {
+		if (acc.rooms.empty())
 			roomless.erase(roomless.find(client));
 
 		auto it = rooms.find(room_id);
