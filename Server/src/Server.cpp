@@ -105,7 +105,7 @@ void Server::onError(std::shared_ptr<Client> client) {
 }
 
 bool Server::onRoom(std::shared_ptr<Client> client, API::ID room_id) {
-	auto &acc = client->getAcc();
+	/*auto &acc = client->getAcc();
 	if (database.mayConnect(acc.id, room_id)) {
 		if (acc.rooms.empty())
 			roomless.erase(roomless.find(client));
@@ -116,6 +116,6 @@ bool Server::onRoom(std::shared_ptr<Client> client, API::ID room_id) {
 
 		it->second.add(client);
 		return true;
-	}
+	}*/
 	return false;
 }

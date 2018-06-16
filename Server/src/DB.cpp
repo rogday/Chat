@@ -1,71 +1,50 @@
 #include "DB.h"
 
-#include <exception>
-
-MYSQL_RES *DB::querry(std::string str) {
-	if (mysql_query(connection, str.data()))
-		return nullptr;
-
-	return mysql_store_result(connection);
-}
-
 DB::DB(boost::asio::io_service &service)
-	: connection(mysql_init(nullptr)), service(service) {
-	if (!connection ||
-		!mysql_real_connect(connection, "localhost", "root", "duck",
-							"messenger", 3306, nullptr, 0))
-		throw std::runtime_error(mysql_error(connection));
-}
-
-DB::~DB() { mysql_close(connection); }
+	: db("../database.db", SQLite::OPEN_READWRITE), service(service) {}
 
 void DB::getUserInfo(std::string login, std::string password,
 					 std::function<void(API::AuthAnswer, Account)> success,
 					 std::function<void()> error) {
-	std::string q = "select id from users where login = '" + login +
-					"' and password = '" + password + "'";
+	try {
+		SQLite::Statement q1(db, "SELECT id FROM users WHERE login = '" +
+									 login + "' AND password = '" + password +
+									 "'");
 
-	MYSQL_RES *result = querry(q);
-	if (!result) {
-		service.post(error);
-		return;
+		if (!q1.executeStep()) {
+			service.post(error);
+			return;
+		}
+
+		API::ID id = q1.getColumn(0).getInt64();
+
+		Account account;
+		account.login = login;
+		account.password = password;
+		account.id = id;
+
+		std::cout << "userID: " << id << std::endl;
+
+		SQLite::Statement q2(db,
+							 "SELECT id,name FROM map,rooms WHERE user_id='" +
+								 std::to_string(id) + "' AND room_id = id");
+
+		API::AuthAnswer auth(id);
+		while (q2.executeStep()) {
+			API::ID room_id = q2.getColumn(0).getInt64();
+			std::string room_name = q2.getColumn(1).getText();
+
+			account.rooms.insert(room_id);
+			auth.insert(room_id, room_name);
+		}
+
+		service.post(std::bind(success, auth, account));
+	} catch (std::exception &e) {
+		std::cerr << e.what() << std::endl;
 	}
-
-	MYSQL_ROW row = mysql_fetch_row(result);
-
-	if (!row) {
-		service.post(error);
-		return;
-	}
-
-	API::ID id = Utils::toID(row[0]);
-	mysql_free_result(result);
-
-	q = "select id,name from map,rooms where user_id='" + std::to_string(id) +
-		"' and room_id = id";
-
-	result = querry(q);
-	if (!result) {
-		service.post(error);
-		return;
-	}
-
-	Account account;
-	account.login = login;
-	account.password = password;
-	account.id = id;
-
-	API::AuthAnswer auth(id);
-	while ((row = mysql_fetch_row(result))) {
-		account.rooms.insert(Utils::toID(row[0]));
-		auth.insert(Utils::toID(row[0]), row[1]);
-	}
-
-	mysql_free_result(result);
-	service.post(std::bind(success, auth, account));
 }
 
-bool DB::mayConnect(API::ID user_id, API::ID room_id) {
+/*bool DB::mayConnect(API::ID user_id, API::ID room_id) {
 	std::string q = "select scope from map,rooms where user_id = '" +
 					std::to_string(user_id) + "' and room_id = '" +
 					std::to_string(room_id) + "' and room_id=id";
@@ -87,4 +66,4 @@ bool DB::mayConnect(API::ID user_id, API::ID room_id) {
 
 	mysql_free_result(result);
 	return ans;
-};
+};*/
